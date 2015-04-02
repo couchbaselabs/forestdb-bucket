@@ -18,6 +18,7 @@ func TestBucketURLToDir(t *testing.T) {
 		{"forestdb:baz", "baz", false},
 		{"/foo", "", true},
 		{"", "", true},
+		{":blah:", "", true},
 	}
 
 	for _, test := range tests {
