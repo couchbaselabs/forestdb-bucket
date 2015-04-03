@@ -11,10 +11,11 @@ import (
 )
 
 type forestdbBucket struct {
-	name           string         // Name of the bucket
-	bucketRootPath string         // Filesystem path where all the bucket dirs live
-	poolName       string         // Name of the pool
-	db             *forestdb.File // The forestdb db handle
+	name           string            // Name of the bucket
+	bucketRootPath string            // Filesystem path where all the bucket dirs live
+	poolName       string            // Name of the pool
+	db             *forestdb.File    // The forestdb db handle
+	kvstore        *forestdb.KVStore // The forestdb key value store
 }
 
 // Creates a new ForestDB bucket
@@ -32,12 +33,19 @@ func NewBucket(dir, poolName, bucketName string) (walrus.Bucket, error) {
 		return nil, err
 	}
 
-	// open forestdb database
+	// open forestdb database file
 	db, err := forestdb.Open(bucket.bucketDbFilePath(), nil)
 	if err != nil {
 		return nil, err
 	}
 	bucket.db = db
+
+	// open forestdb kvstore
+	kvstore, err := db.OpenKVStoreDefault(nil)
+	if err != nil {
+		return nil, err
+	}
+	bucket.kvstore = kvstore
 
 	return bucket, nil
 }
@@ -76,54 +84,65 @@ func (b forestdbBucket) bucketDbFilePath() string {
 // walrus.Bucket interface methods
 
 func (b *forestdbBucket) GetName() string {
-	return ""
+	return b.name
 }
 
-func (b *forestdbBucket) Get(k string, rv interface{}) error {
+func (b *forestdbBucket) Get(key string, returnVal interface{}) error {
+	// Lookup the document
+	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	if err != nil {
+		return err
+	}
+	defer doc.Close()
+	if err := b.kvstore.Get(doc); err != nil {
+		return err
+	}
+	returnVal = doc
 	return nil
 }
 
-func (b *forestdbBucket) GetRaw(k string) ([]byte, error) {
+func (b *forestdbBucket) GetRaw(key string) ([]byte, error) {
 	return nil, nil
 }
 
-func (b *forestdbBucket) Add(k string, exp int, v interface{}) (added bool, err error) {
+func (b *forestdbBucket) Add(key string, expires int, value interface{}) (added bool, err error) {
 	return false, nil
 }
 
-func (b *forestdbBucket) AddRaw(k string, exp int, v []byte) (added bool, err error) {
+func (b *forestdbBucket) AddRaw(key string, expires int, v []byte) (added bool, err error) {
 	return false, nil
 }
 
-func (b *forestdbBucket) Append(k string, data []byte) error {
+func (b *forestdbBucket) Append(key string, data []byte) error {
 	return nil
 }
 
-func (b *forestdbBucket) Set(k string, exp int, v interface{}) error {
+// Set key to value with expires time (which is ignored)
+func (b *forestdbBucket) Set(key string, expires int, value interface{}) error {
 	return nil
 }
 
-func (b *forestdbBucket) SetRaw(k string, exp int, v []byte) error {
+func (b *forestdbBucket) SetRaw(key string, expires int, v []byte) error {
 	return nil
 }
 
-func (b *forestdbBucket) Delete(k string) error {
+func (b *forestdbBucket) Delete(key string) error {
 	return nil
 }
 
-func (b *forestdbBucket) Write(k string, flags int, exp int, v interface{}, opt walrus.WriteOptions) error {
+func (b *forestdbBucket) Write(key string, flags int, expires int, value interface{}, opt walrus.WriteOptions) error {
 	return nil
 }
 
-func (b *forestdbBucket) Update(k string, exp int, callback walrus.UpdateFunc) error {
+func (b *forestdbBucket) Update(key string, expires int, callback walrus.UpdateFunc) error {
 	return nil
 }
 
-func (b *forestdbBucket) WriteUpdate(k string, exp int, callback walrus.WriteUpdateFunc) error {
+func (b *forestdbBucket) WriteUpdate(key string, expires int, callback walrus.WriteUpdateFunc) error {
 	return nil
 }
 
-func (b *forestdbBucket) Incr(k string, amt, def uint64, exp int) (uint64, error) {
+func (b *forestdbBucket) Incr(key string, amt, defaultVal uint64, expires int) (uint64, error) {
 	return 0, nil
 }
 
@@ -152,7 +171,8 @@ func (b *forestdbBucket) StartTapFeed(args walrus.TapArguments) (walrus.TapFeed,
 }
 
 func (b *forestdbBucket) Close() {
-
+	b.kvstore.Close()
+	b.db.Close()
 }
 
 func (b *forestdbBucket) Dump() {

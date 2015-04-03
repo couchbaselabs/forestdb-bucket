@@ -2,12 +2,16 @@ package forestbucket
 
 import "github.com/couchbaselabs/walrus"
 
-func init() {
-	buckets = NewBucketMap()
-}
+const (
+	DefaultPoolName = "default"
+)
 
 // Keep track of all buckets that have been opened
 var buckets *bucketMap
+
+func init() {
+	buckets = NewBucketMap()
+}
 
 // Returns a ForestDB-backed Bucket specific to the given (url, pool, bucketname) tuple.
 // That is, passing the same parameters will return the same Bucket.
