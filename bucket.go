@@ -11,7 +11,7 @@ var buckets *bucketMap
 
 // Creates a new ForestDB bucket
 func NewBucket(dir, poolName, bucketName string) (walrus.Bucket, error) {
-	return nil, nil
+	return &forestdbBucket{}, nil
 }
 
 // Returns a ForestDB-backed Bucket specific to the given (url, pool, bucketname) tuple.
