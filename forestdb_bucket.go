@@ -6,13 +6,15 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/couchbaselabs/goforestdb"
 	"github.com/couchbaselabs/walrus"
 )
 
 type forestdbBucket struct {
-	name           string // Name of the bucket
-	bucketRootPath string // Filesystem path where all the bucket dirs live
-	poolName       string // Name of the pool
+	name           string         // Name of the bucket
+	bucketRootPath string         // Filesystem path where all the bucket dirs live
+	poolName       string         // Name of the pool
+	db             *forestdb.File // The forestdb db handle
 }
 
 // Creates a new ForestDB bucket
@@ -29,6 +31,13 @@ func NewBucket(dir, poolName, bucketName string) (walrus.Bucket, error) {
 	if err := os.MkdirAll(bucket.bucketPath(), 0777); err != nil {
 		return nil, err
 	}
+
+	// open forestdb database
+	db, err := forestdb.Open(bucket.bucketDbFilePath(), nil)
+	if err != nil {
+		return nil, err
+	}
+	bucket.db = db
 
 	return bucket, nil
 }
@@ -51,6 +60,14 @@ func (b forestdbBucket) bucketPath() string {
 	return filepath.Join(
 		b.bucketRootPath,
 		b.bucketDirName(),
+	)
+}
+
+// Get the full path to the db file, eg, /var/lib/buckets/mybucket/mybucket.fdb
+func (b forestdbBucket) bucketDbFilePath() string {
+	return filepath.Join(
+		b.bucketPath(),
+		fmt.Sprintf("%v.fdb", b.name),
 	)
 }
 
