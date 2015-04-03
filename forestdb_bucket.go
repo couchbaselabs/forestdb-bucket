@@ -1,9 +1,62 @@
 package forestbucket
 
-import "github.com/couchbaselabs/walrus"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+
+	"github.com/couchbaselabs/walrus"
+)
 
 type forestdbBucket struct {
+	name           string // Name of the bucket
+	bucketRootPath string // Filesystem path where all the bucket dirs live
+	poolName       string // Name of the pool
 }
+
+// Creates a new ForestDB bucket
+func NewBucket(dir, poolName, bucketName string) (walrus.Bucket, error) {
+
+	bucket := &forestdbBucket{
+		name:           bucketName,
+		bucketRootPath: dir,
+		poolName:       poolName,
+	}
+	runtime.SetFinalizer(bucket, (*forestdbBucket).Close)
+
+	// create bucket path if needed
+	if err := os.MkdirAll(bucket.bucketPath(), 0777); err != nil {
+		return nil, err
+	}
+
+	return bucket, nil
+}
+
+// Get the name of the directory where the forestdb files will be stored,
+// eg: "mybucket" or "poolname-mybucket"
+func (b forestdbBucket) bucketDirName() string {
+	switch b.poolName {
+	case "":
+		return b.name
+	case "default":
+		return b.name
+	default:
+		return fmt.Sprintf("%v-%v", b.poolName, b.name)
+	}
+}
+
+// Get the path to the bucket, eg: /var/lib/buckets/mybucket
+func (b forestdbBucket) bucketPath() string {
+	return filepath.Join(
+		b.bucketRootPath,
+		b.bucketDirName(),
+	)
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+
+// walrus.Bucket interface methods
 
 func (b *forestdbBucket) GetName() string {
 	return ""
@@ -92,3 +145,7 @@ func (b *forestdbBucket) Dump() {
 func (b *forestdbBucket) VBHash(docID string) uint32 {
 	return 0
 }
+
+// End walrus.Bucket interface methods
+
+////////////////////////////////////////////////////////////////////////////////////

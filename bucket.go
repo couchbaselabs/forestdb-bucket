@@ -9,11 +9,6 @@ func init() {
 // Keep track of all buckets that have been opened
 var buckets *bucketMap
 
-// Creates a new ForestDB bucket
-func NewBucket(dir, poolName, bucketName string) (walrus.Bucket, error) {
-	return &forestdbBucket{}, nil
-}
-
 // Returns a ForestDB-backed Bucket specific to the given (url, pool, bucketname) tuple.
 // That is, passing the same parameters will return the same Bucket.
 //
@@ -44,4 +39,5 @@ func GetBucket(url, poolName, bucketName string) (walrus.Bucket, error) {
 		buckets.insert(key, bucket)
 	}
 	return bucket, nil
+
 }
