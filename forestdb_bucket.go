@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/couchbaselabs/goforestdb"
 	"github.com/couchbaselabs/walrus"
@@ -19,14 +18,13 @@ type forestdbBucket struct {
 }
 
 // Creates a new ForestDB bucket
-func NewBucket(dir, poolName, bucketName string) (walrus.Bucket, error) {
+func NewBucket(bucketRootPath, poolName, bucketName string) (walrus.Bucket, error) {
 
 	bucket := &forestdbBucket{
 		name:           bucketName,
-		bucketRootPath: dir,
+		bucketRootPath: bucketRootPath,
 		poolName:       poolName,
 	}
-	runtime.SetFinalizer(bucket, (*forestdbBucket).Close)
 
 	// create bucket path if needed
 	if err := os.MkdirAll(bucket.bucketPath(), 0777); err != nil {

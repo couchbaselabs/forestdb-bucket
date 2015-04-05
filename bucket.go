@@ -1,6 +1,10 @@
 package forestbucket
 
-import "github.com/couchbaselabs/walrus"
+import (
+	"log"
+
+	"github.com/couchbaselabs/walrus"
+)
 
 const (
 	DefaultPoolName = "default"
@@ -27,21 +31,40 @@ func init() {
 //
 func GetBucket(url, poolName, bucketName string) (walrus.Bucket, error) {
 
-	key := buckets.key(url, poolName, bucketName)
+	bucketRootPath, err := bucketURLToDir(url)
+	if err != nil {
+		return nil, err
+	}
+
+	key := buckets.key(bucketRootPath, poolName, bucketName)
 	bucket, found := buckets.find(key)
 
 	if !found {
-		dir, err := bucketURLToDir(url)
+		bucket, err = NewBucket(bucketRootPath, poolName, bucketName)
 		if err != nil {
 			return nil, err
 		}
-		bucket, err = NewBucket(dir, poolName, bucketName)
-		if err != nil {
-			return nil, err
-		}
+		log.Printf("created new bucket: %v", bucket)
 
 		buckets.insert(key, bucket)
+	} else {
+		log.Printf("return existig bucket: %v", bucket)
 	}
 	return bucket, nil
+
+}
+
+// Close a bucket and remove from cache of Bucket objects
+func CloseBucket(bucket walrus.Bucket) {
+
+	forestdbBucket := bucket.(*forestdbBucket)
+	key := buckets.key(
+		forestdbBucket.bucketRootPath,
+		forestdbBucket.poolName,
+		forestdbBucket.name,
+	)
+
+	bucket.Close()
+	buckets.delete(key)
 
 }

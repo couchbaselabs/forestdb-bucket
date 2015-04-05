@@ -46,3 +46,7 @@ func (bm bucketMap) find(key string) (bucket walrus.Bucket, found bool) {
 func (bm bucketMap) insert(key string, bucket walrus.Bucket) {
 	bm.wrapped.Insert(key, bucket)
 }
+
+func (bm bucketMap) delete(key string) {
+	bm.wrapped.Delete(key)
+}
