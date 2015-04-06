@@ -44,8 +44,6 @@ func GetBucket(url, poolName, bucketName string) (walrus.Bucket, error) {
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("created new bucket: %v", bucket)
-
 		buckets.insert(key, bucket)
 	} else {
 		log.Printf("return existig bucket: %v", bucket)

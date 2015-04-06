@@ -46,10 +46,13 @@ func TestGetBucket(t *testing.T) {
 	CloseBucket(bucketCopy)
 	log.Printf("closed bucket")
 
-	/*
+}
 
+func TestGetInvalidBuckets(t *testing.T) {
+
+	/*
 		// get a bucket with an invalid url, assert error
-		bucket, err = GetBucket(
+		bucket, err := GetBucket(
 			":invalid_url:",
 			DefaultPoolName,
 			"testbucket",
@@ -81,8 +84,7 @@ func GetTestBucket() (bucket walrus.Bucket, tempDir string) {
 	)
 
 	if err != nil {
-		log.Printf("error creating bucket*********")
-		// log.Panicf("Error creating bucket: %v", err)
+		log.Panicf("Error creating bucket: %v", err)
 	}
 
 	return bucket, tempDir

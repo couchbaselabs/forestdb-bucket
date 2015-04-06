@@ -1,6 +1,7 @@
 package forestbucket
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -19,31 +20,37 @@ func TestOpenCloseBucket(t *testing.T) {
 
 }
 
-/*
 func BenchmarkOpenCloseBucket(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		bucket, tempDir := GetTestBucket()
-		log.Printf("benchmark bucket %v in %v", bucket, tempDir)
-		CloseBucket(bucket)
-		os.RemoveAll(tempDir)
-	}
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			bucket, tempDir := GetTestBucket()
+			CloseBucket(bucket)
+			os.RemoveAll(tempDir)
+
+		}
+	})
+
+	/*
+		for i := 0; i < b.N; i++ {
+			bucket, tempDir := GetTestBucket()
+			CloseBucket(bucket)
+			os.RemoveAll(tempDir)
+		}
+	*/
 
 }
-*/
 
-/*
 func BenchmarkGet(b *testing.B) {
 	bucket, tempDir := GetTestBucket()
 	log.Printf("benchmark bucket %v in %v", bucket, tempDir)
 	defer func() {
-		log.Printf("calling CloseBucket")
 		CloseBucket(bucket)
-		// os.RemoveAll(tempDir)
+		os.RemoveAll(tempDir)
 	}()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		// bucket.Get()
 		fmt.Sprintf("hello")
 	}
 }
-*/

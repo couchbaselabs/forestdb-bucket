@@ -117,6 +117,7 @@ func (b *forestdbBucket) Append(key string, data []byte) error {
 
 // Set key to value with expires time (which is ignored)
 func (b *forestdbBucket) Set(key string, expires int, value interface{}) error {
+
 	return nil
 }
 
