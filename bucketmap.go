@@ -50,3 +50,13 @@ func (bm bucketMap) insert(key string, bucket walrus.Bucket) {
 func (bm bucketMap) delete(key string) {
 	bm.wrapped.Delete(key)
 }
+
+// Snapshot returns a snapshot copy of the map
+func (bm bucketMap) snapshot() map[string]walrus.Bucket {
+	reply := make(map[string]walrus.Bucket)
+	interfaceSnapshot := bm.wrapped.Snapshot()
+	for k, v := range interfaceSnapshot {
+		reply[k] = v.(walrus.Bucket)
+	}
+	return reply
+}

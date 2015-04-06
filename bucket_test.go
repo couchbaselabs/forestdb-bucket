@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/couchbaselabs/go.assert"
+	"github.com/couchbaselabs/logg"
 	"github.com/couchbaselabs/walrus"
+	"github.com/nu7hatch/gouuid"
 )
 
 func TestGetBucket(t *testing.T) {
@@ -79,10 +81,12 @@ func TestGetBucketNoPoolName(t *testing.T) {
 }
 
 func GetTestBucket() (bucket walrus.Bucket, tempDir string) {
-	// tempDir = os.TempDir()
-	tempDir = "/tmp/foo"
+
+	bucketUuid := NewUuid()
+	tempDir = filepath.Join(os.TempDir(), bucketUuid)
+
 	forestBucketUrl := fmt.Sprintf("forestdb:%v", tempDir)
-	bucketName := "testbucket"
+	bucketName := fmt.Sprintf("testbucket-%v", bucketUuid)
 
 	bucket, err := GetBucket(
 		forestBucketUrl,
@@ -98,23 +102,24 @@ func GetTestBucket() (bucket walrus.Bucket, tempDir string) {
 
 }
 
+func NewUuid() string {
+	u4, err := uuid.NewV4()
+	if err != nil {
+		logg.LogPanic("Error generating uuid", err)
+	}
+	return fmt.Sprintf("%s", u4)
+}
+
 func TestDeleteThenAdd(t *testing.T) {
 
-	tempDir := os.TempDir()
-	defer os.RemoveAll(tempDir)
-	forestBucketUrl := fmt.Sprintf("forestdb:%v", tempDir)
-	bucketName := "testbucket"
+	bucket, tempDir := GetTestBucket()
 
-	bucket, err := GetBucket(
-		forestBucketUrl,
-		DefaultPoolName,
-		bucketName,
-	)
-	assert.True(t, err == nil)
-	defer bucket.Close()
+	defer os.RemoveAll(tempDir)
+	defer bucket.Close() // should be: defer CloseBucket(bucket)
+	// defer CloseBucket(bucket)
 
 	var value interface{}
-	err = bucket.Get("key", &value)
+	err := bucket.Get("key", &value)
 	assert.True(t, err != nil)
 
 	/*
