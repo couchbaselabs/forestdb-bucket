@@ -48,26 +48,33 @@ func TestGetBucket(t *testing.T) {
 
 }
 
-func TestGetInvalidBuckets(t *testing.T) {
+func TestGetInvalidBucket(t *testing.T) {
 
-	/*
-		// get a bucket with an invalid url, assert error
-		bucket, err := GetBucket(
-			":invalid_url:",
-			DefaultPoolName,
-			"testbucket",
-		)
-		assert.True(t, err != nil)
+	// get a bucket with an invalid url, assert error
+	_, err := GetBucket(
+		":invalid_url:",
+		DefaultPoolName,
+		"testbucket",
+	)
+	assert.True(t, err != nil)
 
-		// get a bucket with no pool name
-		bucket, err = GetBucket(
-			forestBucketUrl,
-			"",
-			"testbucket",
-		)
-		assert.True(t, err == nil)
-		assert.True(t, bucket != nil)
-	*/
+}
+
+func TestGetBucketNoPoolName(t *testing.T) {
+
+	tempDir := os.TempDir()
+	defer os.RemoveAll(tempDir)
+
+	forestBucketUrl := fmt.Sprintf("forestdb:%v", tempDir)
+
+	// Get a bucket with no pool name
+	bucket, err := GetBucket(
+		forestBucketUrl,
+		"",
+		"testbucket",
+	)
+	assert.True(t, err == nil)
+	assert.True(t, bucket != nil)
 
 }
 
