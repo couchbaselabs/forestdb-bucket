@@ -2,7 +2,6 @@ package forestbucket
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,6 +23,8 @@ func TestGetBucket(t *testing.T) {
 		DefaultPoolName,
 		bucketName,
 	)
+	defer CloseBucket(bucket)
+
 	assert.True(t, err == nil)
 	assert.True(t, bucket != nil)
 	assert.Equals(t, bucket.GetName(), bucketName)
@@ -41,9 +42,6 @@ func TestGetBucket(t *testing.T) {
 	)
 	assert.True(t, err == nil)
 	assert.Equals(t, bucket, bucketCopy)
-
-	CloseBucket(bucketCopy)
-	log.Printf("closed bucket")
 
 }
 
@@ -105,10 +103,4 @@ func TestDeleteThenAdd(t *testing.T) {
 	   	assert.True(t, added)
 	*/
 
-}
-
-func assertNoError(t *testing.T, err error, message string) {
-	if err != nil {
-		t.Fatalf("%s: %v", message, err)
-	}
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"testing"
 
 	"github.com/couchbaselabs/logg"
 	"github.com/couchbaselabs/walrus"
@@ -39,4 +40,10 @@ func NewUuid() string {
 		logg.LogPanic("Error generating uuid", err)
 	}
 	return fmt.Sprintf("%s", u4)
+}
+
+func assertNoError(t *testing.T, err error, message string) {
+	if err != nil {
+		t.Fatalf("%s: %v", message, err)
+	}
 }
