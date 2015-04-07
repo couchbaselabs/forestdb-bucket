@@ -159,6 +159,9 @@ func (bucket *forestdbBucket) addRaw(key string, expires int, value []byte) (add
 	if err := bucket.kvstore.Set(doc); err != nil {
 		return false, err
 	}
+
+	bucket.db.Commit(forestdb.COMMIT_NORMAL)
+
 	return true, nil
 
 }

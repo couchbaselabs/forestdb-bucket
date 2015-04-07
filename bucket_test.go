@@ -1,13 +1,60 @@
 package forestbucket
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/couchbaselabs/go.assert"
+	"github.com/couchbaselabs/goforestdb"
 )
+
+func TestDurableAdd(t *testing.T) {
+
+	key := "key"
+	val := map[string]string{
+		"foo": "bar",
+	}
+
+	// get a test bucket
+	bucket, tempDir := GetTestBucket()
+
+	// clean up dir when we're done
+	defer os.RemoveAll(tempDir)
+
+	// get the file path
+	fdbBucket := bucket.(*forestdbBucket)
+	dbFile := fdbBucket.bucketDbFilePath()
+
+	// add a key
+	added, err := bucket.Add(key, 0, val)
+	assertNoError(t, err, "Add")
+	assert.True(t, added)
+
+	// close the bucket
+	CloseBucket(bucket)
+
+	// open forestdb database file + kvstore
+	db, err := forestdb.Open(dbFile, nil)
+	assert.True(t, err == nil)
+	kvstore, err := db.OpenKVStoreDefault(nil)
+	assert.True(t, err == nil)
+
+	// make sure we can get the doc by key and it has expected val
+	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	assert.True(t, err == nil)
+	defer doc.Close()
+	err = kvstore.Get(doc)
+	assert.True(t, err == nil)
+	assert.True(t, len(doc.Body()) > 0)
+	docJson := make(map[string]string)
+	err = json.Unmarshal(doc.Body(), &docJson)
+	assert.True(t, err == nil)
+	assert.Equals(t, docJson["foo"], "bar")
+
+}
 
 func TestDeleteThenAdd(t *testing.T) {
 
