@@ -9,6 +9,37 @@ import (
 	"github.com/couchbaselabs/go.assert"
 )
 
+func TestDeleteThenAdd(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	var value interface{}
+	err := bucket.Get("key", &value)
+	assert.True(t, err != nil)
+
+	added, err := bucket.Add("key", 0, "value")
+	assertNoError(t, err, "Add")
+	assert.True(t, added)
+	assertNoError(t, bucket.Get("key", &value), "Get")
+	assert.Equals(t, value, "value")
+
+	/*
+
+	   TODO: re-enable
+
+	   	assertNoError(t, bucket.Delete("key"), "Delete")
+	   	err = bucket.Get("key", &value)
+	   	assert.True(t, err != nil)
+	   	added, err = bucket.Add("key", 0, "value")
+	   	assertNoError(t, err, "Add")
+	   	assert.True(t, added)
+	*/
+
+}
+
 func TestGetBucket(t *testing.T) {
 
 	tempDir := os.TempDir()
@@ -72,35 +103,5 @@ func TestGetBucketNoPoolName(t *testing.T) {
 	)
 	assert.True(t, err == nil)
 	assert.True(t, bucket != nil)
-
-}
-
-func TestDeleteThenAdd(t *testing.T) {
-
-	bucket, tempDir := GetTestBucket()
-
-	defer os.RemoveAll(tempDir)
-	defer CloseBucket(bucket)
-
-	var value interface{}
-	err := bucket.Get("key", &value)
-	assert.True(t, err != nil)
-
-	/*
-
-	   TODO: re-enable
-
-	   	added, err := bucket.Add("key", 0, "value")
-	   	assertNoError(t, err, "Add")
-	   	assert.True(t, added)
-	   	assertNoError(t, bucket.Get("key", &value), "Get")
-	   	assert.Equals(t, value, "value")
-	   	assertNoError(t, bucket.Delete("key"), "Delete")
-	   	err = bucket.Get("key", &value)
-	   	assert.True(t, err != nil)
-	   	added, err = bucket.Add("key", 0, "value")
-	   	assertNoError(t, err, "Add")
-	   	assert.True(t, added)
-	*/
 
 }

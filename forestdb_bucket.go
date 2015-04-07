@@ -1,9 +1,11 @@
 package forestbucket
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/couchbaselabs/goforestdb"
 	"github.com/couchbaselabs/walrus"
@@ -15,6 +17,7 @@ type forestdbBucket struct {
 	poolName       string            // Name of the pool
 	db             *forestdb.File    // The forestdb db handle
 	kvstore        *forestdb.KVStore // The forestdb key value store
+	lock           sync.RWMutex      // For thread-safety
 }
 
 // Creates a new ForestDB bucket
@@ -50,7 +53,7 @@ func NewBucket(bucketRootPath, poolName, bucketName string) (walrus.Bucket, erro
 
 // Get the name of the directory where the forestdb files will be stored,
 // eg: "mybucket" or "poolname-mybucket"
-func (b forestdbBucket) bucketDirName() string {
+func (b *forestdbBucket) bucketDirName() string {
 	switch b.poolName {
 	case "":
 		return b.name
@@ -62,7 +65,7 @@ func (b forestdbBucket) bucketDirName() string {
 }
 
 // Get the path to the bucket, eg: /var/lib/buckets/mybucket
-func (b forestdbBucket) bucketPath() string {
+func (b *forestdbBucket) bucketPath() string {
 	return filepath.Join(
 		b.bucketRootPath,
 		b.bucketDirName(),
@@ -70,7 +73,7 @@ func (b forestdbBucket) bucketPath() string {
 }
 
 // Get the full path to the db file, eg, /var/lib/buckets/mybucket/mybucket.fdb
-func (b forestdbBucket) bucketDbFilePath() string {
+func (b *forestdbBucket) bucketDbFilePath() string {
 	return filepath.Join(
 		b.bucketPath(),
 		fmt.Sprintf("%v.fdb", b.name),
@@ -81,107 +84,185 @@ func (b forestdbBucket) bucketDbFilePath() string {
 
 // walrus.Bucket interface methods
 
-func (b *forestdbBucket) GetName() string {
-	return b.name
+func (bucket *forestdbBucket) GetName() string {
+	return bucket.name
 }
 
-func (b *forestdbBucket) Get(key string, returnVal interface{}) error {
+func (bucket *forestdbBucket) Get(key string, returnVal interface{}) error {
+
 	// Lookup the document
 	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
 	if err != nil {
 		return err
 	}
 	defer doc.Close()
-	if err := b.kvstore.Get(doc); err != nil {
+	if err := bucket.kvstore.Get(doc); err != nil {
 		return err
 	}
-	returnVal = doc
+	if !doc.Deleted() {
+		return json.Unmarshal(doc.Body(), returnVal)
+	}
 	return nil
 }
 
-func (b *forestdbBucket) GetRaw(key string) ([]byte, error) {
+func (bucket *forestdbBucket) GetRaw(key string) ([]byte, error) {
 	return nil, nil
 }
 
-func (b *forestdbBucket) Add(key string, expires int, value interface{}) (added bool, err error) {
-	return false, nil
+func (bucket *forestdbBucket) Add(key string, expires int, value interface{}) (added bool, err error) {
+
+	// Marshal JSON
+	data, err := json.Marshal(value)
+	if err != nil {
+		return false, err
+	}
+
+	return bucket.AddRaw(
+		key,
+		expires,
+		data,
+	)
+
 }
 
-func (b *forestdbBucket) AddRaw(key string, expires int, v []byte) (added bool, err error) {
-	return false, nil
+func (bucket *forestdbBucket) AddRaw(key string, expires int, value []byte) (added bool, err error) {
+
+	// if doc already exists, throw an error
+	exists, err := bucket.keyExists(key)
+	if err != nil {
+		return false, err
+	}
+	if exists {
+		return false, walrus.ErrKeyExists
+	}
+
+	return bucket.addRaw(
+		key,
+		expires,
+		value,
+	)
 }
 
-func (b *forestdbBucket) Append(key string, data []byte) error {
+func (bucket *forestdbBucket) addRaw(key string, expires int, value []byte) (added bool, err error) {
+
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
+	doc, err := forestdb.NewDoc([]byte(key), nil, value)
+	if err != nil {
+		return false, err
+	}
+	defer doc.Close()
+	if err := bucket.kvstore.Set(doc); err != nil {
+		return false, err
+	}
+	return true, nil
+
+}
+
+func (bucket *forestdbBucket) Append(key string, data []byte) error {
 	return nil
 }
 
 // Set key to value with expires time (which is ignored)
-func (b *forestdbBucket) Set(key string, expires int, value interface{}) error {
+func (bucket *forestdbBucket) Set(key string, expires int, value interface{}) error {
 
 	return nil
 }
 
-func (b *forestdbBucket) SetRaw(key string, expires int, v []byte) error {
+func (bucket *forestdbBucket) SetRaw(key string, expires int, v []byte) error {
 	return nil
 }
 
-func (b *forestdbBucket) Delete(key string) error {
+func (bucket *forestdbBucket) Delete(key string) error {
 	return nil
 }
 
-func (b *forestdbBucket) Write(key string, flags int, expires int, value interface{}, opt walrus.WriteOptions) error {
+func (bucket *forestdbBucket) Write(key string, flags int, expires int, value interface{}, opt walrus.WriteOptions) error {
 	return nil
 }
 
-func (b *forestdbBucket) Update(key string, expires int, callback walrus.UpdateFunc) error {
+func (bucket *forestdbBucket) Update(key string, expires int, callback walrus.UpdateFunc) error {
 	return nil
 }
 
-func (b *forestdbBucket) WriteUpdate(key string, expires int, callback walrus.WriteUpdateFunc) error {
+func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walrus.WriteUpdateFunc) error {
 	return nil
 }
 
-func (b *forestdbBucket) Incr(key string, amt, defaultVal uint64, expires int) (uint64, error) {
+func (bucket *forestdbBucket) Incr(key string, amt, defaultVal uint64, expires int) (uint64, error) {
 	return 0, nil
 }
 
-func (b *forestdbBucket) GetDDoc(docname string, into interface{}) error {
+func (bucket *forestdbBucket) GetDDoc(docname string, into interface{}) error {
 	return nil
 }
 
-func (b *forestdbBucket) PutDDoc(docname string, value interface{}) error {
+func (bucket *forestdbBucket) PutDDoc(docname string, value interface{}) error {
 	return nil
 }
 
-func (b *forestdbBucket) DeleteDDoc(docname string) error {
+func (bucket *forestdbBucket) DeleteDDoc(docname string) error {
 	return nil
 }
 
-func (b *forestdbBucket) View(ddoc, name string, params map[string]interface{}) (walrus.ViewResult, error) {
+func (bucket *forestdbBucket) View(ddoc, name string, params map[string]interface{}) (walrus.ViewResult, error) {
 	return walrus.ViewResult{}, nil
 }
 
-func (b *forestdbBucket) ViewCustom(ddoc, name string, params map[string]interface{}, vres interface{}) error {
+func (bucket *forestdbBucket) ViewCustom(ddoc, name string, params map[string]interface{}, vres interface{}) error {
 	return nil
 }
 
-func (b *forestdbBucket) StartTapFeed(args walrus.TapArguments) (walrus.TapFeed, error) {
+func (bucket *forestdbBucket) StartTapFeed(args walrus.TapArguments) (walrus.TapFeed, error) {
 	return nil, nil
 }
 
-func (b *forestdbBucket) Close() {
-	b.kvstore.Close()
-	b.db.Close()
+func (bucket *forestdbBucket) Close() {
+	bucket.kvstore.Close()
+	bucket.db.Close()
 }
 
-func (b *forestdbBucket) Dump() {
+func (bucket *forestdbBucket) Dump() {
 
 }
 
-func (b *forestdbBucket) VBHash(docID string) uint32 {
+func (bucket *forestdbBucket) VBHash(docID string) uint32 {
 	return 0
 }
 
 // End walrus.Bucket interface methods
 
 ////////////////////////////////////////////////////////////////////////////////////
+
+func (bucket *forestdbBucket) keyExists(key string) (exists bool, err error) {
+
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
+	// Lookup the document
+	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	if err != nil {
+		return false, err
+	}
+	defer doc.Close()
+	err = bucket.kvstore.Get(doc)
+
+	if err != nil {
+		if err == forestdb.RESULT_KEY_NOT_FOUND {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+
+	if doc.Deleted() {
+		return false, nil
+	}
+
+	// if the doc has a body, then it exists
+	exists = (len(doc.Body()) > 0)
+
+	return exists, nil
+
+}
