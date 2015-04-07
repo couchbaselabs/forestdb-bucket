@@ -90,6 +90,9 @@ func (bucket *forestdbBucket) GetName() string {
 
 func (bucket *forestdbBucket) Get(key string, returnVal interface{}) error {
 
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
 	// Lookup the document
 	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
 	if err != nil {

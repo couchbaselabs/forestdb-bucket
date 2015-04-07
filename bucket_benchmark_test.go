@@ -1,8 +1,10 @@
 package forestbucket
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"sync/atomic"
 	"testing"
 )
 
@@ -38,7 +40,7 @@ func BenchmarkGet(b *testing.B) {
 
 }
 
-func BenchmarkParallelGet(b *testing.B) {
+func BenchmarkParallelAddGet(b *testing.B) {
 
 	bucket, tempDir := GetTestBucket()
 	defer func() {
@@ -46,14 +48,27 @@ func BenchmarkParallelGet(b *testing.B) {
 		os.RemoveAll(tempDir)
 	}()
 
+	counter := int64(0)
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			var value interface{}
-			err := bucket.Get("key", &value)
-			if err == nil {
-				log.Panicf("No error calling bucket.Get(), expected error")
+
+			nextKeyId := atomic.AddInt64(&counter, 1)
+			key := fmt.Sprintf("key-%v", nextKeyId)
+			added, err := bucket.Add(key, 0, []byte(`{"hello":"world"}`))
+			if !added {
+				log.Panicf("Unable to add key: %v", key)
 			}
+			if err != nil {
+				log.Panicf("Error add key: %v. Err: %v", key, err)
+			}
+			var value interface{}
+			err = bucket.Get(key, &value)
+			if err != nil {
+				log.Panicf("Error loading key: %v. Err: %v", key, err)
+			}
+
 		}
 	})
 
