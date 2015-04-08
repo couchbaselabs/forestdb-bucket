@@ -1,6 +1,8 @@
 package forestbucket
 
 import (
+	"log"
+
 	"github.com/couchbaselabs/walrus"
 	"github.com/tleyden/go-safe-dstruct/queue"
 )
@@ -76,4 +78,37 @@ func (feed *tapFeedImpl) run() {
 func (bucket *forestdbBucket) enqueueBackfillEvents(startSequence uint64, keysOnly bool, q *queue.Queue) {
 	panic("enqueueBackfillEvents not implemented yet")
 
+}
+
+// Caller must have the bucket's RLock, because this method iterates bucket.tapFeeds
+func (bucket *forestdbBucket) _postTapEvent(event walrus.TapEvent) {
+	var eventNoValue walrus.TapEvent = event // copies the struct
+	eventNoValue.Value = nil
+	log.Printf("posting tap event to %v tap feeds %v", len(bucket.tapFeeds), bucket.tapFeeds)
+	for _, feed := range bucket.tapFeeds {
+		if feed != nil && feed.channel != nil {
+			if feed.args.KeysOnly {
+				feed.events.Push(&eventNoValue)
+			} else {
+				feed.events.Push(&event)
+			}
+		}
+	}
+}
+
+func (bucket *forestdbBucket) _postTapMutationEvent(key string, value []byte, seq uint64) {
+	bucket._postTapEvent(walrus.TapEvent{
+		Opcode:   walrus.TapMutation,
+		Key:      []byte(key),
+		Value:    copySlice(value),
+		Sequence: seq,
+	})
+}
+
+func (bucket *forestdbBucket) _postTapDeletionEvent(key string, seq uint64) {
+	bucket._postTapEvent(walrus.TapEvent{
+		Opcode:   walrus.TapDeletion,
+		Key:      []byte(key),
+		Sequence: seq,
+	})
 }

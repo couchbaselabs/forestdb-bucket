@@ -163,6 +163,9 @@ func (bucket *forestdbBucket) addRaw(key string, expires int, value []byte) (add
 
 	bucket.db.Commit(forestdb.COMMIT_NORMAL)
 
+	// Post a TAP notification:
+	bucket._postTapMutationEvent(key, value, uint64(doc.SeqNum()))
+
 	return true, nil
 
 }

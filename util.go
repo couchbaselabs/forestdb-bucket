@@ -23,3 +23,12 @@ func bucketURLToDir(urlStr string) (dir string, err error) {
 	return dir, nil
 
 }
+
+func copySlice(slice []byte) []byte {
+	if slice == nil {
+		return nil
+	}
+	copied := make([]byte, len(slice))
+	copy(copied, slice)
+	return copied
+}
