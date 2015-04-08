@@ -18,6 +18,7 @@ type forestdbBucket struct {
 	db             *forestdb.File    // The forestdb db handle
 	kvstore        *forestdb.KVStore // The forestdb key value store
 	lock           sync.RWMutex      // For thread-safety
+	tapFeeds       []*tapFeedImpl    // Tap feeds
 }
 
 // Creates a new ForestDB bucket
@@ -218,10 +219,6 @@ func (bucket *forestdbBucket) View(ddoc, name string, params map[string]interfac
 
 func (bucket *forestdbBucket) ViewCustom(ddoc, name string, params map[string]interface{}, vres interface{}) error {
 	return nil
-}
-
-func (bucket *forestdbBucket) StartTapFeed(args walrus.TapArguments) (walrus.TapFeed, error) {
-	return nil, nil
 }
 
 func (bucket *forestdbBucket) Close() {
