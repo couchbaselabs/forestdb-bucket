@@ -3,6 +3,7 @@ package forestbucket
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -161,7 +162,11 @@ func (bucket *forestdbBucket) addRaw(key string, expires int, value []byte) (add
 		return false, err
 	}
 
-	bucket.db.Commit(forestdb.COMMIT_NORMAL)
+	if err := bucket.db.Commit(forestdb.COMMIT_NORMAL); err != nil {
+		return false, err
+	}
+
+	log.Printf("added doc with seq num: %v", uint64(doc.SeqNum()))
 
 	// Post a TAP notification:
 	bucket._postTapMutationEvent(key, value, uint64(doc.SeqNum()))
@@ -185,7 +190,32 @@ func (bucket *forestdbBucket) SetRaw(key string, expires int, v []byte) error {
 }
 
 func (bucket *forestdbBucket) Delete(key string) error {
+
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
+	// Lookup the document
+	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	if err != nil {
+		return err
+	}
+	defer doc.Close()
+	err = bucket.kvstore.Get(doc)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("deleting doc with seq num: %v", uint64(doc.SeqNum()))
+
+	if err := bucket.kvstore.Delete(doc); err != nil {
+		return err
+	}
+
+	// Post a TAP notification:
+	bucket._postTapDeletionEvent(key, uint64(doc.SeqNum()))
+
 	return nil
+
 }
 
 func (bucket *forestdbBucket) Write(key string, flags int, expires int, value interface{}, opt walrus.WriteOptions) error {
