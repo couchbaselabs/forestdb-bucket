@@ -3,6 +3,7 @@ package forestbucket
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/couchbaselabs/go.assert"
 	"github.com/couchbaselabs/goforestdb"
+	"github.com/couchbaselabs/walrus"
 )
 
 func TestDurableAdd(t *testing.T) {
@@ -134,6 +136,28 @@ func TestIncrAtomic(t *testing.T) {
 	value, err := bucket.Incr("key", 0, 0, 0)
 	assertNoError(t, err, "Incr")
 	assert.Equals(t, int(value), numIncrements*(numIncrements+1)/2)
+}
+
+func TestAppend(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	err := bucket.Append("key", []byte(" World"))
+	assert.DeepEquals(t, err, walrus.MissingError{
+		Key: "key",
+	})
+
+	log.Printf("call SetRaw")
+	err = bucket.SetRaw("key", 0, []byte("Hello"))
+	assertNoError(t, err, "SetRaw")
+	err = bucket.Append("key", []byte(" World"))
+	assertNoError(t, err, "Append")
+	value, err := bucket.GetRaw("key")
+	assertNoError(t, err, "GetRaw")
+	assert.DeepEquals(t, value, []byte("Hello World"))
 }
 
 func TestGetBucket(t *testing.T) {

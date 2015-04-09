@@ -112,7 +112,24 @@ func (bucket *forestdbBucket) Get(key string, returnVal interface{}) error {
 }
 
 func (bucket *forestdbBucket) GetRaw(key string) ([]byte, error) {
+
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
+	// Lookup the document
+	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer doc.Close()
+	if err := bucket.kvstore.Get(doc); err != nil {
+		return nil, err
+	}
+	if !doc.Deleted() {
+		return doc.Body(), nil
+	}
 	return nil, nil
+
 }
 
 func (bucket *forestdbBucket) Add(key string, expires int, value interface{}) (added bool, err error) {
@@ -142,41 +159,83 @@ func (bucket *forestdbBucket) AddRaw(key string, expires int, value []byte) (add
 		return false, walrus.ErrKeyExists
 	}
 
-	return bucket.addRaw(
+	if err := bucket.setRaw(
 		key,
 		expires,
 		value,
-	)
+	); err != nil {
+		return false, err
+	}
+	return true, nil
+
 }
 
-func (bucket *forestdbBucket) addRaw(key string, expires int, value []byte) (added bool, err error) {
+func (bucket *forestdbBucket) setRaw(key string, expires int, value []byte) error {
 
 	bucket.lock.Lock()
 	defer bucket.lock.Unlock()
 
 	doc, err := forestdb.NewDoc([]byte(key), nil, value)
 	if err != nil {
-		return false, err
+		return err
 	}
 	defer doc.Close()
 	if err := bucket.kvstore.Set(doc); err != nil {
-		return false, err
+		return err
 	}
 
 	if err := bucket.db.Commit(forestdb.COMMIT_NORMAL); err != nil {
-		return false, err
+		return err
 	}
-
-	log.Printf("added doc with seq num: %v", uint64(doc.SeqNum()))
 
 	// Post a TAP notification:
 	bucket._postTapMutationEvent(key, value, uint64(doc.SeqNum()))
 
-	return true, nil
+	return nil
 
 }
 
 func (bucket *forestdbBucket) Append(key string, data []byte) error {
+
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
+	// lookup doc for key
+	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	if err != nil {
+		log.Printf("error creating doc: %v", err)
+		return err
+	}
+	defer doc.Close()
+
+	err = bucket.kvstore.Get(doc)
+	if err != nil {
+		if err == forestdb.RESULT_KEY_NOT_FOUND {
+			return walrus.MissingError{
+				Key: key,
+			}
+		}
+		return err
+	}
+
+	// if it does exist, append this data onto it
+	updatedDoc, err := forestdb.NewDoc(
+		[]byte(key),
+		nil,
+		append(doc.Body(), data...),
+	)
+	if err != nil {
+		return err
+	}
+	if err := bucket.kvstore.Set(updatedDoc); err != nil {
+		return err
+	}
+	if err := bucket.db.Commit(forestdb.COMMIT_NORMAL); err != nil {
+		return err
+	}
+
+	bucket._postTapMutationEvent(key, updatedDoc.Body(), uint64(updatedDoc.SeqNum()))
+
 	return nil
 }
 
@@ -186,8 +245,12 @@ func (bucket *forestdbBucket) Set(key string, expires int, value interface{}) er
 	return nil
 }
 
-func (bucket *forestdbBucket) SetRaw(key string, expires int, v []byte) error {
-	return nil
+func (bucket *forestdbBucket) SetRaw(key string, expires int, value []byte) error {
+	return bucket.setRaw(
+		key,
+		expires,
+		value,
+	)
 }
 
 func (bucket *forestdbBucket) Delete(key string) error {
