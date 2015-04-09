@@ -194,20 +194,12 @@ func (bucket *forestdbBucket) Delete(key string) error {
 	bucket.lock.Lock()
 	defer bucket.lock.Unlock()
 
-	// Lookup the document
 	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
 	if err != nil {
 		return err
 	}
 	defer doc.Close()
-	err = bucket.kvstore.Get(doc)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("deleting doc with seq num: %v", uint64(doc.SeqNum()))
-
-	if err := bucket.kvstore.Delete(doc); err != nil {
+	if err := bucket.kvstore.Set(doc); err != nil {
 		return err
 	}
 
