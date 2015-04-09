@@ -9,7 +9,7 @@ import (
 )
 
 // Disabled since the backfill stuff is not implemented yet
-func DisabledTestBackfill(t *testing.T) {
+func TestBackfill(t *testing.T) {
 
 	bucket, tempDir := GetTestBucket()
 

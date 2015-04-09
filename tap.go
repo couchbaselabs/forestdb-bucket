@@ -3,6 +3,7 @@ package forestbucket
 import (
 	"log"
 
+	"github.com/couchbaselabs/goforestdb"
 	"github.com/couchbaselabs/walrus"
 	"github.com/tleyden/go-safe-dstruct/queue"
 )
@@ -27,7 +28,12 @@ func (bucket *forestdbBucket) StartTapFeed(args walrus.TapArguments) (walrus.Tap
 
 	if args.Backfill != walrus.TapNoBackfill {
 		feed.events.Push(&walrus.TapEvent{Opcode: walrus.TapBeginBackfill})
-		bucket.enqueueBackfillEvents(args.Backfill, args.KeysOnly, feed.events)
+		if err := bucket.enqueueBackfillEvents(
+			args.Backfill,
+			args.KeysOnly,
+			feed.events); err != nil {
+			return nil, err
+		}
 		feed.events.Push(&walrus.TapEvent{Opcode: walrus.TapEndBackfill})
 	}
 
@@ -75,8 +81,45 @@ func (feed *tapFeedImpl) run() {
 	}
 }
 
-func (bucket *forestdbBucket) enqueueBackfillEvents(startSequence uint64, keysOnly bool, q *queue.Queue) {
-	panic("enqueueBackfillEvents not implemented yet")
+func (bucket *forestdbBucket) enqueueBackfillEvents(startSequence uint64, keysOnly bool, q *queue.Queue) error {
+
+	bucket.lock.RLock()
+	defer bucket.lock.RUnlock()
+
+	// create an iterator
+	options := forestdb.ITR_NONE
+	endSeq := forestdb.SeqNum(0) // is this how to specify no end sequence?
+	iterator, err := bucket.kvstore.IteratorSequenceInit(
+		forestdb.SeqNum(startSequence),
+		endSeq,
+		options,
+	)
+	if err != nil {
+		return err
+	}
+
+	for {
+		doc, err := iterator.Get()
+		if err != nil {
+			return err
+		}
+		if doc.Body() != nil && uint64(doc.SeqNum()) >= startSequence {
+			event := walrus.TapEvent{
+				Opcode:   walrus.TapMutation,
+				Key:      doc.Key(),
+				Sequence: uint64(doc.SeqNum()),
+			}
+			if !keysOnly {
+				event.Value = doc.Body()
+			}
+			q.Push(&event)
+		}
+		if err := iterator.Next(); err != nil {
+			// we're done.  since expected error in this case, don't return an error
+			return nil
+		}
+
+	}
 
 }
 
