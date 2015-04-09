@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/couchbaselabs/go.assert"
@@ -108,6 +109,31 @@ func TestIncr(t *testing.T) {
 	count, err = bucket.Incr("count2", 0, 0, -1)
 	assertTrue(t, err != nil, "Expected error from Incr")
 
+}
+
+// Spawns 1000 goroutines that 'simultaneously' use Incr to increment the same counter by 1.
+func TestIncrAtomic(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	var waiters sync.WaitGroup
+	numIncrements := 1000
+	waiters.Add(numIncrements)
+	for i := uint64(1); i <= uint64(numIncrements); i++ {
+		numToAdd := i // lock down the value for the goroutine
+		go func() {
+			_, err := bucket.Incr("key", numToAdd, numToAdd, 0)
+			assertNoError(t, err, "Incr")
+			waiters.Add(-1)
+		}()
+	}
+	waiters.Wait()
+	value, err := bucket.Incr("key", 0, 0, 0)
+	assertNoError(t, err, "Incr")
+	assert.Equals(t, int(value), numIncrements*(numIncrements+1)/2)
 }
 
 func TestGetBucket(t *testing.T) {

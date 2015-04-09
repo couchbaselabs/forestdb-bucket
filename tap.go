@@ -1,8 +1,6 @@
 package forestbucket
 
 import (
-	"log"
-
 	"github.com/couchbaselabs/goforestdb"
 	"github.com/couchbaselabs/walrus"
 	"github.com/tleyden/go-safe-dstruct/queue"
@@ -127,7 +125,7 @@ func (bucket *forestdbBucket) enqueueBackfillEvents(startSequence uint64, keysOn
 func (bucket *forestdbBucket) _postTapEvent(event walrus.TapEvent) {
 	var eventNoValue walrus.TapEvent = event // copies the struct
 	eventNoValue.Value = nil
-	log.Printf("posting tap event to %v tap feeds %v", len(bucket.tapFeeds), bucket.tapFeeds)
+
 	for _, feed := range bucket.tapFeeds {
 		if feed != nil && feed.channel != nil {
 			if feed.args.KeysOnly {
