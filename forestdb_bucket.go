@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"github.com/couchbaselabs/goforestdb"
@@ -223,7 +224,64 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 }
 
 func (bucket *forestdbBucket) Incr(key string, amt, defaultVal uint64, expires int) (uint64, error) {
-	return 0, nil
+
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
+	// Lookup the document
+	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer doc.Close()
+
+	// get the dock from the kvstore
+	err = bucket.kvstore.Get(doc)
+
+	// we expect no error, or a key not found error if it doesn't exist
+	if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
+		return 0, err
+	}
+
+	counter := defaultVal
+	if doc.Body() != nil && len(doc.Body()) > 0 {
+		counter, err = strconv.ParseUint(string(doc.Body()), 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		if amt == 0 {
+			return counter, nil // just reading existing value
+		}
+		counter += amt
+	} else {
+		if expires < 0 {
+			return 0, walrus.MissingError{
+				Key: key,
+			}
+		}
+		counter = defaultVal
+	}
+
+	// update the doc with incremented value
+	updatedDoc, err := forestdb.NewDoc(
+		[]byte(key),
+		nil,
+		[]byte(strconv.FormatUint(counter, 10)),
+	)
+	if err != nil {
+		return 0, err
+	}
+	if err := bucket.kvstore.Set(updatedDoc); err != nil {
+		return 0, err
+	}
+	if err := bucket.db.Commit(forestdb.COMMIT_NORMAL); err != nil {
+		return 0, err
+	}
+
+	bucket._postTapMutationEvent(key, updatedDoc.Body(), uint64(updatedDoc.SeqNum()))
+
+	return counter, nil
+
 }
 
 func (bucket *forestdbBucket) GetDDoc(docname string, into interface{}) error {

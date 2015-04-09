@@ -47,3 +47,9 @@ func assertNoError(t *testing.T, err error, message string) {
 		t.Fatalf("%s: %v", message, err)
 	}
 }
+
+func assertTrue(t *testing.T, success bool, message string) {
+	if !success {
+		t.Fatalf("%s", message)
+	}
+}

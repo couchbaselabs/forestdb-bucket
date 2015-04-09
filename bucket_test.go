@@ -82,6 +82,34 @@ func TestDeleteThenAdd(t *testing.T) {
 
 }
 
+func TestIncr(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	count, err := bucket.Incr("count1", 1, 100, 0)
+	assertNoError(t, err, "Incr")
+	assert.Equals(t, count, uint64(100))
+
+	count, err = bucket.Incr("count1", 0, 0, 0)
+	assertNoError(t, err, "Incr")
+	assert.Equals(t, count, uint64(100))
+
+	count, err = bucket.Incr("count1", 10, 100, 0)
+	assertNoError(t, err, "Incr")
+	assert.Equals(t, count, uint64(110))
+
+	count, err = bucket.Incr("count1", 0, 0, 0)
+	assertNoError(t, err, "Incr")
+	assert.Equals(t, count, uint64(110))
+
+	count, err = bucket.Incr("count2", 0, 0, -1)
+	assertTrue(t, err != nil, "Expected error from Incr")
+
+}
+
 func TestGetBucket(t *testing.T) {
 
 	tempDir := os.TempDir()
