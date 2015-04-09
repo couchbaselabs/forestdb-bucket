@@ -73,17 +73,12 @@ func TestDeleteThenAdd(t *testing.T) {
 	assertNoError(t, bucket.Get("key", &value), "Get")
 	assert.Equals(t, value, "value")
 
-	/*
-
-	   TODO: re-enable
-
-	   	assertNoError(t, bucket.Delete("key"), "Delete")
-	   	err = bucket.Get("key", &value)
-	   	assert.True(t, err != nil)
-	   	added, err = bucket.Add("key", 0, "value")
-	   	assertNoError(t, err, "Add")
-	   	assert.True(t, added)
-	*/
+	assertNoError(t, bucket.Delete("key"), "Delete")
+	err = bucket.Get("key", &value)
+	assert.True(t, err != nil)
+	added, err = bucket.Add("key", 0, "value")
+	assertNoError(t, err, "Add")
+	assert.True(t, added)
 
 }
 
