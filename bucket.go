@@ -14,7 +14,7 @@ const (
 var buckets *bucketMap
 
 func init() {
-	buckets = NewBucketMap()
+	buckets = newBucketMap()
 }
 
 // Returns a ForestDB-backed Bucket specific to the given (url, pool, bucketname) tuple.

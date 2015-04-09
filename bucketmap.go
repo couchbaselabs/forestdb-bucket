@@ -11,7 +11,7 @@ type bucketMap struct {
 	wrapped mapserver.MapServer
 }
 
-func NewBucketMap() *bucketMap {
+func newBucketMap() *bucketMap {
 	bucketMap := &bucketMap{
 		wrapped: mapserver.NewMapserver(),
 	}
