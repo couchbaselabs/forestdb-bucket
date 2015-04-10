@@ -1,6 +1,7 @@
 package forestbucket
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 )
@@ -31,4 +32,10 @@ func copySlice(slice []byte) []byte {
 	copied := make([]byte, len(slice))
 	copy(copied, slice)
 	return copied
+}
+
+func isJSON(raw []byte) bool {
+	var js interface{}
+	return json.Unmarshal(raw, &js) == nil
+
 }

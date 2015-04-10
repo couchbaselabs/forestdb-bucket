@@ -127,24 +127,50 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		}
 	}()
 
-	// TODO: forestdb iterator
+	// TODO: this should be starting from view.lastIndexedSequence
+	startSequence := 0
 
-	// Now shovel all the changed document bodies into the mapper:
-	/*
-		for docid, doc := range bucket.Docs {
-			if doc.Sequence > view.lastIndexedSequence {
-				raw := doc.Raw
-				if raw != nil {
-					if !doc.IsJSON {
-						raw = []byte(`{}`) // Ignore contents of non-JSON (raw) docs
-					}
-					mapInput <- [2]string{docid, string(raw)}
-					updatedKeys[docid] = struct{}{}
-				}
-			}
+	// create an iterator
+	options := forestdb.ITR_NONE
+	endSeq := forestdb.SeqNum(0) // is this how to specify no end sequence?
+	iterator, err := bucket.kvstore.IteratorSequenceInit(
+		forestdb.SeqNum(startSequence),
+		endSeq,
+		options,
+	)
+	if err != nil {
+		// TODO: this should return an error instead
+		log.Panicf("Could not create forestdb iterator on: %v", bucket)
+	}
+
+	for {
+		doc, err := iterator.Get()
+		if err != nil {
+			log.Printf("Error getting doc from iterator: %v, break out of loop", err)
+			break
 		}
-		close(mapInput)
-	*/
+
+		if uint64(doc.SeqNum()) > view.lastIndexedSequence {
+			raw := doc.Body()
+			docid := string(doc.Key())
+			if raw != nil {
+				if !isJSON(raw) {
+					raw = []byte(`{}`) // Ignore contents of non-JSON (raw) docs
+				}
+				mapInput <- [2]string{docid, string(raw)}
+				updatedKeys[docid] = struct{}{}
+			}
+
+		}
+
+		if err := iterator.Next(); err != nil {
+			// we're done.
+			log.Printf("iterator.next() returned an error: %v, break out of loop", err)
+			break
+		}
+
+	}
+	close(mapInput)
 
 	// Wait for the result processing to finish:
 	waiter.Wait()
