@@ -1,6 +1,7 @@
 package forestbucket
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -52,4 +53,13 @@ func assertTrue(t *testing.T, success bool, message string) {
 	if !success {
 		t.Fatalf("%s", message)
 	}
+}
+
+func setJSON(bucket walrus.Bucket, docid string, jsonDoc string) error {
+	var obj interface{}
+	err := json.Unmarshal([]byte(jsonDoc), &obj)
+	if err != nil {
+		return err
+	}
+	return bucket.Set(docid, 0, obj)
 }
