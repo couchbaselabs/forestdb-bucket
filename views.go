@@ -23,7 +23,7 @@ type forestdbDesignDoc map[string]*forestdbView
 
 func (bucket *forestdbBucket) View(docName, viewName string, params map[string]interface{}) (walrus.ViewResult, error) {
 
-	log.Printf("View(%q, %q) ...", docName, viewName)
+	log.Printf("forestdbBucket View() called with: (%q, %q)", docName, viewName)
 
 	stale := true
 	if params != nil {
@@ -34,32 +34,51 @@ func (bucket *forestdbBucket) View(docName, viewName string, params map[string]i
 
 	// Look up the view and its index:
 	var result walrus.ViewResult
-	view, resultMaybe := bucket.findView(docName, viewName, stale)
+	view, resultMaybe, err := bucket.findView(docName, viewName, stale)
+	if err != nil {
+		return result, err
+	}
 	if view == nil {
+		log.Printf("View not found")
 		return result, walrus.MissingError{Key: docName + "/" + viewName}
 	} else if resultMaybe != nil {
+		log.Printf("Got resultMaybe: %+v", *resultMaybe)
 		result = *resultMaybe
 	} else {
+		log.Printf("Going to update view")
 		result = bucket.updateView(view, 0)
 	}
 
+	log.Printf("Going to process view result: %+v", result)
 	return walrus.ProcessViewResult(result, params, bucket, view.reduceFunction)
 
 }
 
 // Looks up a lolrusView, and its current index if it's up-to-date enough.
 // TODO: consolidate with walrus codebase to fix code duplication
-func (bucket *forestdbBucket) findView(docName, viewName string, staleOK bool) (view *forestdbView, result *walrus.ViewResult) {
+func (bucket *forestdbBucket) findView(docName, viewName string, staleOK bool) (view *forestdbView, result *walrus.ViewResult, err error) {
 	bucket.lock.RLock()
 	defer bucket.lock.RUnlock()
 
 	if ddoc, exists := bucket.views[docName]; exists {
 		view = ddoc[viewName]
 		if view != nil {
-			upToDate := view.lastIndexedSequence == bucket.LastSeq
+
+			lastSeq, err := bucket.LastSeq()
+			if err != nil {
+				return view, result, err
+			}
+
+			log.Printf("Check if view up to date.  view.lastIndexedSequence: %v, bucket.LastSeq: %v", view.lastIndexedSequence, lastSeq)
+
+			upToDate := view.lastIndexedSequence == lastSeq
+
 			if !upToDate && view.lastIndexedSequence > 0 && staleOK {
-				go bucket.updateView(view, bucket.LastSeq)
+				log.Printf("View not up to date, calling updateView()")
+				go bucket.updateView(view, lastSeq)
 				upToDate = true
+			} else {
+				log.Printf("View already up to date")
 			}
 			if upToDate {
 				curResult := view.index // copy the struct
@@ -67,7 +86,7 @@ func (bucket *forestdbBucket) findView(docName, viewName string, staleOK bool) (
 			}
 		}
 	}
-	return
+	return view, result, nil
 }
 
 // Updates the view index if necessary, and returns it.
@@ -77,15 +96,22 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 	bucket.lock.Lock()
 	defer bucket.lock.Unlock()
 
+	result := walrus.ViewResult{}
+
+	lastSeq, err := bucket.LastSeq()
+	if err != nil {
+		log.Printf("Error updating view, LastSeq() returned err: %v", err)
+		return result
+	}
+
 	if toSequence == 0 {
-		toSequence = bucket.LastSeq
+		toSequence = lastSeq
 	}
 	if view.lastIndexedSequence >= toSequence {
 		return view.index
 	}
 	log.Printf("\t... updating index to seq %d (from %d)", toSequence, view.lastIndexedSequence)
 
-	var result walrus.ViewResult
 	result.Rows = make([]*walrus.ViewRow, 0)
 	result.Errors = make([]walrus.ViewError, 0)
 
@@ -190,7 +216,7 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 	sort.Sort(&result)
 	result.Collator.Clear() // don't keep collation state around
 
-	view.lastIndexedSequence = bucket.LastSeq
+	view.lastIndexedSequence = lastSeq
 	view.index = result
 	return view.index
 }

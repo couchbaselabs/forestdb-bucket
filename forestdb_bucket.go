@@ -23,7 +23,6 @@ type forestdbBucket struct {
 	lock           sync.RWMutex                 // For thread-safety
 	tapFeeds       []*tapFeedImpl               // Tap feeds
 	views          map[string]forestdbDesignDoc // Stores runtime view/index data
-	LastSeq        uint64                       // Last sequence number assigned
 }
 
 // Creates a new ForestDB bucket
@@ -422,4 +421,12 @@ func (bucket *forestdbBucket) keyExists(key string) (exists bool, err error) {
 
 	return exists, nil
 
+}
+
+func (bucket *forestdbBucket) LastSeq() (lastSeq uint64, err error) {
+	kvStoreInfo, err := bucket.kvstore.Info()
+	if err != nil {
+		return uint64(0), err
+	}
+	return uint64(kvStoreInfo.LastSeqNum()), nil
 }
