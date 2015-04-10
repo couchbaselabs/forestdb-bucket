@@ -23,6 +23,7 @@ type forestdbBucket struct {
 	lock           sync.RWMutex                 // For thread-safety
 	tapFeeds       []*tapFeedImpl               // Tap feeds
 	views          map[string]forestdbDesignDoc // Stores runtime view/index data
+	LastSeq        uint64                       // Last sequence number assigned
 }
 
 // Creates a new ForestDB bucket
@@ -372,14 +373,6 @@ func (bucket *forestdbBucket) Incr(key string, amt, defaultVal uint64, expires i
 
 	return counter, nil
 
-}
-
-func (bucket *forestdbBucket) View(ddoc, name string, params map[string]interface{}) (walrus.ViewResult, error) {
-	return walrus.ViewResult{}, nil
-}
-
-func (bucket *forestdbBucket) ViewCustom(ddoc, name string, params map[string]interface{}, vres interface{}) error {
-	return nil
 }
 
 func (bucket *forestdbBucket) Close() {
