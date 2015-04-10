@@ -124,10 +124,12 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 	// Build a parallel task to map docs:
 	mapFunction := view.mapFunction
 	mapper := func(rawInput interface{}, output chan<- interface{}) {
+		log.Printf("Mapper got input: %v", rawInput)
 		input := rawInput.([2]string)
 		docid := input[0]
 		raw := input[1]
 		rows, err := mapFunction.CallFunction(string(raw), docid)
+		log.Printf("Mapper produced rows: %v", rows)
 		if err != nil {
 			log.Printf("Error running map function: %s", err)
 			output <- walrus.ViewError{docid, err.Error()}
@@ -174,19 +176,30 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		if err != nil {
 			log.Printf("Error getting doc from iterator: %v, break out of loop", err)
 			break
+		} else {
+			log.Printf("Got a doc from iterator.  key: %v", string(doc.Key()))
 		}
 
+		log.Printf("Check if seqnum > lastIndexed.  doc.seqnum: %v, lastIndexed: %v", doc.SeqNum(), view.lastIndexedSequence)
+
 		if uint64(doc.SeqNum()) > view.lastIndexedSequence {
+			log.Printf("Yes, seqnum > lastIndexed")
+
 			raw := doc.Body()
+			log.Printf("raw doc body: %v", string(raw))
 			docid := string(doc.Key())
 			if raw != nil {
 				if !isJSON(raw) {
+					log.Printf("its not json, set to empty dict")
 					raw = []byte(`{}`) // Ignore contents of non-JSON (raw) docs
 				}
+				log.Printf("send to map input channel")
 				mapInput <- [2]string{docid, string(raw)}
 				updatedKeys[docid] = struct{}{}
 			}
 
+		} else {
+			log.Printf("No, seqnum not greater than lastIndexed")
 		}
 
 		if err := iterator.Next(); err != nil {

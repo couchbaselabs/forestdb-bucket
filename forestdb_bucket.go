@@ -269,7 +269,13 @@ func (bucket *forestdbBucket) Append(key string, data []byte) error {
 // Set key to value with expires time (which is ignored)
 func (bucket *forestdbBucket) Set(key string, expires int, value interface{}) error {
 
-	return nil
+	// Marshal JSON
+	data, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return bucket.SetRaw(key, expires, data)
+
 }
 
 func (bucket *forestdbBucket) SetRaw(key string, expires int, value []byte) error {
