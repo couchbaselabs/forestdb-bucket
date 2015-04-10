@@ -31,12 +31,8 @@ func (bucket *forestdbBucket) GetDDoc(docname string, into interface{}) error {
 		}
 		return err
 	}
-	// Have to roundtrip thru JSON to return it as arbitrary interface{}:
-	raw, err := json.Marshal(rawDdoc)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(raw, into)
+
+	return json.Unmarshal(rawDdoc, into)
 }
 
 func (bucket *forestdbBucket) PutDDoc(docname string, value interface{}) error {
