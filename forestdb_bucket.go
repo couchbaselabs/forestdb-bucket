@@ -14,13 +14,15 @@ import (
 )
 
 type forestdbBucket struct {
-	name           string            // Name of the bucket
-	bucketRootPath string            // Filesystem path where all the bucket dirs live
-	poolName       string            // Name of the pool
-	db             *forestdb.File    // The forestdb db handle
-	kvstore        *forestdb.KVStore // The forestdb key value store
-	lock           sync.RWMutex      // For thread-safety
-	tapFeeds       []*tapFeedImpl    // Tap feeds
+	name           string                       // Name of the bucket
+	bucketRootPath string                       // Filesystem path where all the bucket dirs live
+	poolName       string                       // Name of the pool
+	db             *forestdb.File               // The forestdb db handle
+	kvstore        *forestdb.KVStore            // The primary forestdb key value store
+	kvstoreDdocs   *forestdb.KVStore            // Another kv store for design docs
+	lock           sync.RWMutex                 // For thread-safety
+	tapFeeds       []*tapFeedImpl               // Tap feeds
+	views          map[string]forestdbDesignDoc // Stores runtime view/index data
 }
 
 // Creates a new ForestDB bucket
@@ -44,12 +46,37 @@ func NewBucket(bucketRootPath, poolName, bucketName string) (walrus.Bucket, erro
 	}
 	bucket.db = db
 
-	// open forestdb kvstore
+	// open primary kvstore
 	kvstore, err := db.OpenKVStoreDefault(nil)
 	if err != nil {
 		return nil, err
 	}
 	bucket.kvstore = kvstore
+
+	// open design docs kvstore
+	kvstoreDdocs, err := db.OpenKVStore("designdocs", nil)
+	if err != nil {
+		return nil, err
+	}
+	bucket.kvstoreDdocs = kvstoreDdocs
+
+	// create a new map for holding instantiated views
+	bucket.views = map[string]forestdbDesignDoc{}
+
+	/*
+
+		        TODO: need to port these two things from lolrus:
+
+			bucket.lastSeqSaved = bucket.LastSeq
+
+			// Recompile the design docs:
+			for name, ddoc := range bucket.DesignDocs {
+				if err := bucket._compileDesignDoc(name, ddoc); err != nil {
+					return nil, err
+				}
+			}
+
+	*/
 
 	return bucket, nil
 }
@@ -345,18 +372,6 @@ func (bucket *forestdbBucket) Incr(key string, amt, defaultVal uint64, expires i
 
 	return counter, nil
 
-}
-
-func (bucket *forestdbBucket) GetDDoc(docname string, into interface{}) error {
-	return nil
-}
-
-func (bucket *forestdbBucket) PutDDoc(docname string, value interface{}) error {
-	return nil
-}
-
-func (bucket *forestdbBucket) DeleteDDoc(docname string) error {
-	return nil
 }
 
 func (bucket *forestdbBucket) View(ddoc, name string, params map[string]interface{}) (walrus.ViewResult, error) {
