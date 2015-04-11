@@ -313,8 +313,12 @@ func (bucket *forestdbBucket) Write(key string, flags int, expires int, value in
 }
 
 func (bucket *forestdbBucket) Update(key string, expires int, callback walrus.UpdateFunc) error {
-	log.Panicf("Update not implemented")
-	return nil
+
+	writeCallback := func(current []byte) (updated []byte, opts walrus.WriteOptions, err error) {
+		updated, err = callback(current)
+		return
+	}
+	return bucket.WriteUpdate(key, expires, writeCallback)
 }
 
 func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walrus.WriteUpdateFunc) error {
