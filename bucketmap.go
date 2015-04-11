@@ -3,8 +3,8 @@ package forestbucket
 import (
 	"fmt"
 
+	"github.com/couchbaselabs/go-safe-dstruct/mapserver"
 	"github.com/couchbaselabs/walrus"
-	"github.com/tleyden/go-safe-dstruct/mapserver"
 )
 
 type bucketMap struct {

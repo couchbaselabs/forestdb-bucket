@@ -1,9 +1,9 @@
 package forestbucket
 
 import (
+	"github.com/couchbaselabs/go-safe-dstruct/queue"
 	"github.com/couchbaselabs/goforestdb"
 	"github.com/couchbaselabs/walrus"
-	"github.com/tleyden/go-safe-dstruct/queue"
 )
 
 type tapFeedImpl struct {
