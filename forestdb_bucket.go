@@ -308,14 +308,40 @@ func (bucket *forestdbBucket) Delete(key string) error {
 }
 
 func (bucket *forestdbBucket) Write(key string, flags int, expires int, value interface{}, opt walrus.WriteOptions) error {
+	log.Panicf("Write not implemented")
 	return nil
 }
 
 func (bucket *forestdbBucket) Update(key string, expires int, callback walrus.UpdateFunc) error {
+	log.Panicf("Update not implemented")
 	return nil
 }
 
 func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walrus.WriteUpdateFunc) error {
+
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
+	docBody, err := bucket.kvstore.GetKV([]byte(key))
+	if err != nil {
+		if err == forestdb.RESULT_KEY_NOT_FOUND {
+			return walrus.MissingError{
+				Key: key,
+			}
+		}
+		return err
+	}
+
+	// TODO: is copySlice really needed here?
+	newDocBody, _, err := callback(copySlice(docBody))
+	if err != nil {
+		return err
+	}
+
+	if err := bucket.setRaw(key, expires, newDocBody); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -386,10 +412,11 @@ func (bucket *forestdbBucket) Close() {
 }
 
 func (bucket *forestdbBucket) Dump() {
-
+	log.Panicf("Dump() not implemented")
 }
 
 func (bucket *forestdbBucket) VBHash(docID string) uint32 {
+	log.Panicf("VBHash() not implemented")
 	return 0
 }
 
