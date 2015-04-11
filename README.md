@@ -21,3 +21,14 @@ $ go test -v -race -cpu 4
 ```
 $ go test -v -bench . -cpu 4
 ```
+
+## TODO
+
+* Views are not being created on startup
+  * Test: create view, close and re-open bucket, query view
+* Views are stored in memory
+  * Add benchmarks that show this is slow (re-open db and query a view, which will cause rebuild)
+* Views are walking the entire set of docs instead of starting at a startSeq
+  * Add benchmarks that add lots of docs, show how views don't scale
+* No database compaction is happening
+

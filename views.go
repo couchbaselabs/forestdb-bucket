@@ -132,7 +132,10 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		log.Printf("Mapper produced rows: %v", rows)
 		if err != nil {
 			log.Printf("Error running map function: %s", err)
-			output <- walrus.ViewError{docid, err.Error()}
+			output <- walrus.ViewError{
+				From:   docid,
+				Reason: err.Error(),
+			}
 		} else {
 			output <- rows
 		}

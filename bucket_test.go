@@ -101,7 +101,7 @@ func TestView(t *testing.T) {
 
 	// Delete the design doc:
 	assertNoError(t, bucket.DeleteDDoc("docname"), "DeleteDDoc")
-	assert.DeepEquals(t, bucket.GetDDoc("docname", &echo), walrus.MissingError{"docname"})
+	assert.DeepEquals(t, bucket.GetDDoc("docname", &echo), walrus.MissingError{Key: "docname"})
 }
 
 func TestCheckDDoc(t *testing.T) {
