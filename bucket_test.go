@@ -14,6 +14,30 @@ import (
 	"github.com/couchbaselabs/walrus"
 )
 
+func TestUpdate(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	// UpdateFunc func(current []byte) (updated []byte, err error)
+	updateFunc := func(current []byte) (updated []byte, err error) {
+		return []byte(`{"foo":"bar"}`), nil
+	}
+	err := bucket.Update("key", 0, updateFunc)
+	log.Printf("update err: %v", err)
+	assert.True(t, err == nil)
+
+	// make sure we can get the doc by key and it has expected val
+	var value interface{}
+	err = bucket.Get("key", &value)
+	assert.True(t, err != nil)
+	valueMap := value.(map[string]string)
+	assert.Equals(t, valueMap["foo"], "bar")
+
+}
+
 // Create a simple view and run it on some documents
 func TestView(t *testing.T) {
 
