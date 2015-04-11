@@ -7,7 +7,7 @@ You will first need to install ForestDB (see goforestdb README)
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/tleyden/forestdb-bucket?status.png)](https://godoc.org/github.com/tleyden/forestdb-bucket) 
+[![GoDoc](https://godoc.org/github.com/couchbaselabs/forestdb-bucket?status.png)](https://godoc.org/github.com/couchbaselabs/forestdb-bucket) 
 
 ## Running tests
 
