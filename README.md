@@ -22,6 +22,13 @@ $ go test -v -race -cpu 4
 $ go test -v -bench . -cpu 4
 ```
 
+## Generate code coverage report
+
+```
+$ go test -coverprofile=coverage.out 
+$ go tool cover -html=coverage.out
+```
+
 ## TODO
 
 * Views are not being created on startup
