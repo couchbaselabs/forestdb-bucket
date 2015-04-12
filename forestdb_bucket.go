@@ -323,16 +323,13 @@ func (bucket *forestdbBucket) Update(key string, expires int, callback walrus.Up
 
 func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walrus.WriteUpdateFunc) error {
 
-	bucket.lock.Lock()
-	defer bucket.lock.Unlock()
+	// can't lock here, because setRaw locks below ..
+	// bucket.lock.Lock()
+	// defer bucket.lock.Unlock()
 
 	docBody, err := bucket.kvstore.GetKV([]byte(key))
-	if err != nil {
-		if err == forestdb.RESULT_KEY_NOT_FOUND {
-			return walrus.MissingError{
-				Key: key,
-			}
-		}
+	if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
+		// if it's an unexpected error, return it
 		return err
 	}
 
