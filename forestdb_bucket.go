@@ -65,9 +65,7 @@ func NewBucket(bucketRootPath, poolName, bucketName string) (walrus.Bucket, erro
 
 	/*
 
-		        TODO: need to port these two things from lolrus:
-
-			bucket.lastSeqSaved = bucket.LastSeq
+		        TODO: need to port this from lolrus after writing a unit test
 
 			// Recompile the design docs:
 			for name, ddoc := range bucket.DesignDocs {

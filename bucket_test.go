@@ -38,9 +38,7 @@ func TestUpdate(t *testing.T) {
 
 	fetchedDoc, _ := json.Marshal(value)
 	log.Printf("fetched: %v", string(fetchedDoc))
-
-	// valueMap := value.(map[string]string)
-	// assert.Equals(t, valueMap["foo"], "bar")
+	assert.Equals(t, string(fetchedDoc), string(testDocBytes))
 
 }
 
