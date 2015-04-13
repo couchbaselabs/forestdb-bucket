@@ -219,6 +219,9 @@ func TestDeleteThenAdd(t *testing.T) {
 	defer CloseBucket(bucket)
 
 	var value interface{}
+	var value2 interface{}
+	var value3 interface{}
+
 	err := bucket.Get("key", &value)
 	assert.True(t, err != nil)
 
@@ -229,11 +232,20 @@ func TestDeleteThenAdd(t *testing.T) {
 	assert.Equals(t, value, "value")
 
 	assertNoError(t, bucket.Delete("key"), "Delete")
-	err = bucket.Get("key", &value)
+	err = bucket.Get("key", &value2)
+	_, ok := err.(walrus.MissingError) // make sure right type of error
+	assert.True(t, ok)
+	log.Printf("err: %v", err)
 	assert.True(t, err != nil)
+
 	added, err = bucket.Add("key", 0, "value")
 	assertNoError(t, err, "Add")
 	assert.True(t, added)
+
+	err = bucket.Get("key", &value3)
+	assert.True(t, err == nil)
+	log.Printf("value3: %v", value3)
+	assert.Equals(t, value3, "value")
 
 }
 

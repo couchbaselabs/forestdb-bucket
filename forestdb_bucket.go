@@ -139,6 +139,17 @@ func (bucket *forestdbBucket) Get(key string, returnVal interface{}) error {
 		return err
 	}
 
+	// workaround hack: in order to get Sync Gateway's TestLocalDocs() to
+	// work, as well as the new version of TestDeleteThenAdd, treat an
+	// empty value as missing.  TODO: I'm still confused as to why
+	// Delete() shouldn't just call ForestDB delete, rather than trying
+	// to set to a nil value.  (See https://github.com/couchbase/goforestdb/issues/15)
+	if doc.Body() == nil || len(doc.Body()) == 0 {
+		return walrus.MissingError{
+			Key: key,
+		}
+	}
+
 	if !doc.Deleted() {
 		return json.Unmarshal(doc.Body(), returnVal)
 	}
