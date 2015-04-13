@@ -343,14 +343,33 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 	// bucket.lock.Lock()
 	// defer bucket.lock.Unlock()
 
-	docBody, err := bucket.kvstore.GetKV([]byte(key))
+	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	if err != nil {
+		return err
+	}
+	defer doc.Close()
+
+	err = bucket.kvstore.Get(doc)
 	if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
 		// if it's an unexpected error, return it
 		return err
 	}
 
+	docBody := doc.Body()
+
+	// workaround hack: in the Delete() method, we set the doc body to nil.
+	// however, when we fetch it, it comes back as an empty slice.  in order
+	// to workaraound that behavior and get the TestDeleteThenUpdate() test to
+	// pass, if docBody is empty, change it to nil
+	if len(docBody) == 0 {
+		docBody = nil
+	}
+
 	// TODO: is copySlice really needed here?
-	newDocBody, _, err := callback(copySlice(docBody))
+	docBodyCopy := copySlice(docBody)
+
+	newDocBody, _, err := callback(docBodyCopy)
+
 	if err != nil {
 		return err
 	}

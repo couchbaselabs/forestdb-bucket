@@ -42,6 +42,13 @@ func TestUpdate(t *testing.T) {
 
 	// UpdateFunc func(current []byte) (updated []byte, err error)
 	updateFunc := func(current []byte) (updated []byte, err error) {
+		log.Printf("current: %v", current)
+		if current == nil {
+			log.Printf("current == nil")
+		}
+		if len(current) == 0 {
+			log.Printf("len(current) == 0")
+		}
 		return testDocBytes, nil
 	}
 	err := bucket.Update("key", 0, updateFunc)
@@ -227,6 +234,87 @@ func TestDeleteThenAdd(t *testing.T) {
 	added, err = bucket.Add("key", 0, "value")
 	assertNoError(t, err, "Add")
 	assert.True(t, added)
+
+}
+
+// Verify that if you delete a doc from bucket, and then call
+// Update(), it will call Update() with a current value of nil
+func TestDeleteThenUpdate(t *testing.T) {
+
+	var value interface{}
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	// Add
+	added, err := bucket.Add("key", 0, "value")
+	assertNoError(t, err, "Add")
+	assert.True(t, added)
+	assertNoError(t, bucket.Get("key", &value), "Get")
+	assert.Equals(t, value, "value")
+
+	// Delete
+	var valuePostDelete interface{}
+	assertNoError(t, bucket.Delete("key"), "Delete")
+	err = bucket.Get("key", &valuePostDelete)
+	log.Printf("value post delete: %v", valuePostDelete)
+	assert.True(t, err != nil)
+	assert.True(t, valuePostDelete == nil)
+
+	// Update
+	updateFunc := func(current []byte) (updated []byte, err error) {
+		// since we deleted the value, we expect current to be nil
+		log.Printf("UpdateFunc called")
+		if current != nil {
+			log.Printf("current != nil")
+			return nil, fmt.Errorf("Expected current to be nil")
+		} else {
+			log.Printf("current is nil")
+		}
+		return []byte("some_value"), nil
+	}
+	err = bucket.Update("key", 0, updateFunc)
+
+	assert.True(t, err == nil)
+
+}
+
+// Unexpected behavior with Goforestdb -- set a doc to nil value, but
+// when fetching it, it returns an empty slice.
+// See https://github.com/couchbase/goforestdb/issues/15
+func DisabledTestSetDocBodyToNil(t *testing.T) {
+
+	rawBucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(rawBucket)
+
+	bucket := rawBucket.(*forestdbBucket)
+
+	// set "foo" key to value "bar"
+	err := bucket.kvstore.SetKV([]byte("foo"), []byte("bar"))
+	assert.True(t, err == nil)
+
+	err = bucket.db.Commit(forestdb.COMMIT_NORMAL)
+	assert.True(t, err == nil)
+
+	// now set "foo" key to nil
+	doc, err := forestdb.NewDoc([]byte("foo"), nil, nil)
+	assert.True(t, err == nil)
+
+	defer doc.Close()
+	err = bucket.kvstore.Set(doc)
+	assert.True(t, err == nil)
+
+	err = bucket.db.Commit(forestdb.COMMIT_NORMAL)
+	assert.True(t, err == nil)
+
+	// get the value of "foo" key
+	docBody, err := bucket.kvstore.GetKV([]byte("foo"))
+	assert.True(t, err == nil)
+	assert.True(t, docBody == nil) // fails, because it's an empty slice
 
 }
 
