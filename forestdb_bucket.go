@@ -116,6 +116,7 @@ func (bucket *forestdbBucket) GetName() string {
 	return bucket.name
 }
 
+// TODO: remove code duplication with GetRaw()
 func (bucket *forestdbBucket) Get(key string, returnVal interface{}) error {
 
 	bucket.lock.Lock()
@@ -127,15 +128,24 @@ func (bucket *forestdbBucket) Get(key string, returnVal interface{}) error {
 		return err
 	}
 	defer doc.Close()
-	if err := bucket.kvstore.Get(doc); err != nil {
+
+	err = bucket.kvstore.Get(doc)
+	if err != nil {
+		if err == forestdb.RESULT_KEY_NOT_FOUND {
+			return walrus.MissingError{
+				Key: key,
+			}
+		}
 		return err
 	}
+
 	if !doc.Deleted() {
 		return json.Unmarshal(doc.Body(), returnVal)
 	}
 	return nil
 }
 
+// TODO: remove code duplication with Get()
 func (bucket *forestdbBucket) GetRaw(key string) ([]byte, error) {
 
 	bucket.lock.Lock()
@@ -147,9 +157,17 @@ func (bucket *forestdbBucket) GetRaw(key string) ([]byte, error) {
 		return nil, err
 	}
 	defer doc.Close()
-	if err := bucket.kvstore.Get(doc); err != nil {
+
+	err = bucket.kvstore.Get(doc)
+	if err != nil {
+		if err == forestdb.RESULT_KEY_NOT_FOUND {
+			return nil, walrus.MissingError{
+				Key: key,
+			}
+		}
 		return nil, err
 	}
+
 	if !doc.Deleted() {
 		return doc.Body(), nil
 	}

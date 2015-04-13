@@ -14,6 +14,23 @@ import (
 	"github.com/couchbaselabs/walrus"
 )
 
+// If we try to Get() a missing key, asser that a walrus.MissingError is returned
+func TestGetMissingKey(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	var value interface{}
+	err := bucket.Get("missingkey", &value)
+	assert.True(t, err != nil)
+	log.Printf("err: %v type: %T", err, err)
+	_, ok := err.(walrus.MissingError)
+	assert.True(t, ok)
+
+}
+
 func TestUpdate(t *testing.T) {
 
 	bucket, tempDir := GetTestBucket()
