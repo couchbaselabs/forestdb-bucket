@@ -110,6 +110,16 @@ func TestView(t *testing.T) {
 	assert.DeepEquals(t, result.Rows[3], &walrus.ViewRow{ID: "doc4", Key: []interface{}{17.0, false}})
 	assert.DeepEquals(t, result.Rows[4], &walrus.ViewRow{ID: "doc5", Key: []interface{}{17.0, true}})
 
+	// Try a ViewCustom query
+	customResult := map[string]interface{}{}
+	err = bucket.ViewCustom("docname", "view1", options, &customResult)
+	assert.True(t, err == nil)
+	totalRowsRaw, ok := customResult["total_rows"]
+	assert.True(t, ok)
+	totalRows, ok := totalRowsRaw.(float64) // TODO: why isn't this an int?
+	assert.True(t, ok)
+	assert.Equals(t, totalRows, float64(5.0))
+
 	// Try a startkey:
 	options["startkey"] = "k2"
 	options["include_docs"] = true

@@ -54,6 +54,17 @@ func (bucket *forestdbBucket) View(docName, viewName string, params map[string]i
 
 }
 
+func (bucket *forestdbBucket) ViewCustom(ddoc, name string, params map[string]interface{}, vres interface{}) error {
+
+	result, err := bucket.View(ddoc, name, params)
+	if err != nil {
+		return err
+	}
+	marshaled, _ := json.Marshal(result)
+	return json.Unmarshal(marshaled, vres)
+
+}
+
 // Looks up a lolrusView, and its current index if it's up-to-date enough.
 // TODO: consolidate with walrus codebase to fix code duplication
 func (bucket *forestdbBucket) findView(docName, viewName string, staleOK bool) (view *forestdbView, result *walrus.ViewResult, err error) {
@@ -235,10 +246,6 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 	view.lastIndexedSequence = lastSeq
 	view.index = result
 	return view.index
-}
-
-func (bucket *forestdbBucket) ViewCustom(ddoc, name string, params map[string]interface{}, vres interface{}) error {
-	return nil
 }
 
 func (bucket *forestdbBucket) GetDDoc(docname string, into interface{}) error {
