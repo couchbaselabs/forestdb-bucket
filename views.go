@@ -23,8 +23,6 @@ type forestdbDesignDoc map[string]*forestdbView
 
 func (bucket *forestdbBucket) View(docName, viewName string, params map[string]interface{}) (walrus.ViewResult, error) {
 
-	log.Printf("forestdbBucket View() called with: (%q, %q)", docName, viewName)
-
 	stale := true
 	if params != nil {
 		if staleParam, found := params["stale"].(bool); found {
@@ -39,17 +37,13 @@ func (bucket *forestdbBucket) View(docName, viewName string, params map[string]i
 		return result, err
 	}
 	if view == nil {
-		log.Printf("View not found")
 		return result, walrus.MissingError{Key: docName + "/" + viewName}
 	} else if resultMaybe != nil {
-		log.Printf("Got resultMaybe: %+v", *resultMaybe)
 		result = *resultMaybe
 	} else {
-		log.Printf("Going to update view")
 		result = bucket.updateView(view, 0)
 	}
 
-	log.Printf("Going to process view result: %+v", result)
 	return walrus.ProcessViewResult(result, params, bucket, view.reduceFunction)
 
 }
@@ -80,17 +74,13 @@ func (bucket *forestdbBucket) findView(docName, viewName string, staleOK bool) (
 				return view, result, err
 			}
 
-			log.Printf("Check if view up to date.  view.lastIndexedSequence: %v, bucket.LastSeq: %v", view.lastIndexedSequence, lastSeq)
-
 			upToDate := view.lastIndexedSequence == lastSeq
 
 			if !upToDate && view.lastIndexedSequence > 0 && staleOK {
-				log.Printf("View not up to date, calling updateView()")
 				go bucket.updateView(view, lastSeq)
 				upToDate = true
-			} else {
-				log.Printf("View already up to date")
 			}
+
 			if upToDate {
 				curResult := view.index // copy the struct
 				result = &curResult
@@ -135,12 +125,10 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 	// Build a parallel task to map docs:
 	mapFunction := view.mapFunction
 	mapper := func(rawInput interface{}, output chan<- interface{}) {
-		log.Printf("Mapper got input: %v", rawInput)
 		input := rawInput.([2]string)
 		docid := input[0]
 		raw := input[1]
 		rows, err := mapFunction.CallFunction(string(raw), docid)
-		log.Printf("Mapper produced rows: %v", rows)
 		if err != nil {
 			log.Printf("Error running map function: %s", err)
 			output <- walrus.ViewError{
@@ -188,32 +176,21 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 	for {
 		doc, err := iterator.Get()
 		if err != nil {
-			log.Printf("Error getting doc from iterator: %v, break out of loop", err)
 			break
-		} else {
-			log.Printf("Got a doc from iterator.  key: %v", string(doc.Key()))
 		}
 
-		log.Printf("Check if seqnum > lastIndexed.  doc.seqnum: %v, lastIndexed: %v", doc.SeqNum(), view.lastIndexedSequence)
-
 		if uint64(doc.SeqNum()) > view.lastIndexedSequence {
-			log.Printf("Yes, seqnum > lastIndexed")
 
 			raw := doc.Body()
-			log.Printf("raw doc body: %v", string(raw))
 			docid := string(doc.Key())
 			if raw != nil {
 				if !isJSON(raw) {
-					log.Printf("its not json, set to empty dict")
 					raw = []byte(`{}`) // Ignore contents of non-JSON (raw) docs
 				}
-				log.Printf("send to map input channel")
 				mapInput <- [2]string{docid, string(raw)}
 				updatedKeys[docid] = struct{}{}
 			}
 
-		} else {
-			log.Printf("No, seqnum not greater than lastIndexed")
 		}
 
 		if err := iterator.Next(); err != nil {

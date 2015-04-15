@@ -389,12 +389,10 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 	newDocBody, _, err := callback(docBodyCopy)
 
 	if err != nil {
-		log.Printf("WriteUpdate returning err from callback: %v", err)
 		return err
 	}
 
 	if err := bucket.setRaw(key, expires, newDocBody); err != nil {
-		log.Printf("WriteUpdate setRaw returning err: %v", err)
 		return err
 	}
 
