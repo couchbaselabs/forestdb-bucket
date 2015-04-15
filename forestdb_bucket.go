@@ -28,11 +28,16 @@ type forestdbBucket struct {
 // Creates a new ForestDB bucket
 func NewBucket(bucketRootPath, poolName, bucketName string) (walrus.Bucket, error) {
 
+	log.Printf("forestdb NewBucket() with path: %v, pool: %v, name: %v", bucketRootPath, poolName, bucketName)
+
 	bucket := &forestdbBucket{
 		name:           bucketName,
 		bucketRootPath: bucketRootPath,
 		poolName:       poolName,
 	}
+
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
 
 	// create bucket path if needed
 	if err := os.MkdirAll(bucket.bucketPath(), 0777); err != nil {
@@ -384,7 +389,7 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 	newDocBody, _, err := callback(docBodyCopy)
 
 	if err != nil {
-		log.Printf("WriteUpdate returning err: %v", err)
+		log.Printf("WriteUpdate returning err from callback: %v", err)
 		return err
 	}
 
@@ -458,8 +463,34 @@ func (bucket *forestdbBucket) Incr(key string, amt, defaultVal uint64, expires i
 }
 
 func (bucket *forestdbBucket) Close() {
+
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
+	if bucket.kvstore == nil || bucket.db == nil {
+		// already closed, ignore this call
+		return
+	}
+
 	bucket.kvstore.Close()
 	bucket.db.Close()
+
+	// set to nil so that we can't accidentally use the underlying
+	// kvstore again for this bucket instance
+	bucket.kvstore = nil
+	bucket.kvstoreDdocs = nil
+	bucket.db = nil
+	bucket.views = nil
+
+	// remove from bucket map so that if someone tries to get
+	// this bucket, they'll get a new instance
+	key := buckets.key(
+		bucket.bucketRootPath,
+		bucket.poolName,
+		bucket.name,
+	)
+	buckets.delete(key)
+
 }
 
 func (bucket *forestdbBucket) Dump() {
@@ -474,6 +505,15 @@ func (bucket *forestdbBucket) VBHash(docID string) uint32 {
 // End walrus.Bucket interface methods
 
 ////////////////////////////////////////////////////////////////////////////////////
+
+func (bucket *forestdbBucket) CloseAndDelete() error {
+	path := bucket.bucketDbFilePath()
+	bucket.Close()
+	if path == "" {
+		return nil
+	}
+	return os.Remove(path)
+}
 
 func (bucket *forestdbBucket) keyExists(key string) (exists bool, err error) {
 

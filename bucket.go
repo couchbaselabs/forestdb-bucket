@@ -15,6 +15,10 @@ var buckets *bucketMap
 
 func init() {
 	buckets = newBucketMap()
+
+	// uncomment this line to enable verbose forestdb logging
+	// forestdb.Log = logger{}
+
 }
 
 // Returns a ForestDB-backed Bucket specific to the given (url, pool, bucketname) tuple.
@@ -54,15 +58,5 @@ func GetBucket(url, poolName, bucketName string) (walrus.Bucket, error) {
 
 // Close a bucket and remove from cache of Bucket objects
 func CloseBucket(bucket walrus.Bucket) {
-
-	forestdbBucket := bucket.(*forestdbBucket)
-	key := buckets.key(
-		forestdbBucket.bucketRootPath,
-		forestdbBucket.poolName,
-		forestdbBucket.name,
-	)
-
 	bucket.Close()
-	buckets.delete(key)
-
 }

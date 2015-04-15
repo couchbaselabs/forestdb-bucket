@@ -218,7 +218,6 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 
 		if err := iterator.Next(); err != nil {
 			// we're done.
-			log.Printf("iterator.next() returned an error: %v, break out of loop", err)
 			break
 		}
 

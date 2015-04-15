@@ -480,3 +480,22 @@ func TestGetBucketNoPoolName(t *testing.T) {
 	assert.True(t, bucket != nil)
 
 }
+
+// emulates what happens in the Sync Gateway Flush() scenario
+// where the bucket is closed twice.
+func TestCloseTwice(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+
+	if bucket, ok := bucket.(walrus.DeleteableBucket); ok {
+		bucket.Close()
+		err := bucket.CloseAndDelete()
+		log.Printf("CloseAndDelete() returned: %v", err)
+		assert.True(t, err == nil)
+	} else {
+		log.Fatalf("Bucket does not support Deletable interface")
+	}
+
+}
