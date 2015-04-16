@@ -366,6 +366,7 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 		// bucket.lock.Lock()
 		err = bucket.kvstore.Get(doc)
 		// bucket.lock.Unlock()
+
 		if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
 			// if it's an unexpected error, return it
 			log.Printf("WriteUpdate got unexpected err calling Get(): %v", err)

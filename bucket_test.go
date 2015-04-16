@@ -612,44 +612,62 @@ func TestWriteUpdateInconsistentRead(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	defer CloseBucket(bucket)
 
-	numKeys := 1000
-	keys := make(chan string, numKeys)
+	numKeys := 10000
+	// keys := make(chan string, numKeys)
 
-	go func() {
-		for i := 0; i < numKeys; i++ {
+	wg := sync.WaitGroup{}
+	wg.Add(numKeys)
 
+	for i := 0; i < numKeys; i++ {
+
+		go func() {
 			key := NewUuid()
 			data := []byte(key)
 			if err := bucket.SetRaw(key, 0, data); err != nil {
 				log.Panicf("Unable to set key: %v", key)
 			}
-			keys <- key
-
-		}
-
-	}()
-
-	wg := sync.WaitGroup{}
-	wg.Add(numKeys)
-
-	go func() {
-		for key := range keys {
-			updateFunc := func(current []byte) (updated []byte, err error) {
-				if current == nil {
-					log.Panicf("should not be nil, we set this value earlier")
+			// keys <- key
+			go func() {
+				updateFunc := func(current []byte) (updated []byte, err error) {
+					if current == nil {
+						log.Panicf("should not be nil, we set this value earlier")
+					}
+					if len(current) == 0 {
+						log.Panicf("should not be empty, we set this value earlier")
+					}
+					return current, nil
 				}
-				if len(current) == 0 {
-					log.Panicf("should not be empty, we set this value earlier")
+				err := bucket.Update(key, 0, updateFunc)
+				if err != nil {
+					log.Panicf("Got error calling update: %v", err)
 				}
-				return current, nil
+				wg.Done()
+
+			}()
+		}()
+
+	}
+
+	/*
+		go func() {
+			for key := range keys {
+				updateFunc := func(current []byte) (updated []byte, err error) {
+					if current == nil {
+						log.Panicf("should not be nil, we set this value earlier")
+					}
+					if len(current) == 0 {
+						log.Panicf("should not be empty, we set this value earlier")
+					}
+					return current, nil
+				}
+				err := bucket.Update(key, 0, updateFunc)
+				assert.True(t, err == nil)
+				wg.Done()
+
 			}
-			err := bucket.Update(key, 0, updateFunc)
-			assert.True(t, err == nil)
-			wg.Done()
-
-		}
-		close(keys)
-	}()
+			close(keys)
+		}()
+	*/
 
 	log.Printf("Calling wg.Wait()")
 	wg.Wait()
