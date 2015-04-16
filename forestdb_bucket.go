@@ -358,7 +358,7 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 	for {
 		doc, err := forestdb.NewDoc([]byte(key), nil, nil)
 		if err != nil {
-			log.Printf("WriteUPdate couldn't create new doc: %v", err)
+			log.Printf("WriteUpdate couldn't create new doc: %v", err)
 			return err
 		}
 		defer doc.Close()
@@ -369,6 +369,7 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 			log.Printf("WriteUpdate got unexpected err calling Get(): %v", err)
 			return err
 		}
+		log.Printf("kvstore.Get for key: %v.  err: %v, doc.SeqNum: %v", key, err, doc.SeqNum())
 
 		docBody := doc.Body()
 

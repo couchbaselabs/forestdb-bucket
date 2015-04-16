@@ -1,6 +1,8 @@
 package forestbucket
 
 import (
+	"log"
+
 	"github.com/couchbaselabs/go-safe-dstruct/queue"
 	"github.com/couchbaselabs/goforestdb"
 	"github.com/couchbaselabs/walrus"
@@ -138,6 +140,7 @@ func (bucket *forestdbBucket) _postTapEvent(event walrus.TapEvent) {
 }
 
 func (bucket *forestdbBucket) _postTapMutationEvent(key string, value []byte, seq uint64) {
+	log.Printf("_postTapMutation for key: %v seq: %v", key, seq)
 	bucket._postTapEvent(walrus.TapEvent{
 		Opcode:   walrus.TapMutation,
 		Key:      []byte(key),
