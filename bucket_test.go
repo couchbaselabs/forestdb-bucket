@@ -605,15 +605,23 @@ func TestWriteUpdateConsistency(t *testing.T) {
 // Goroutine2 calls WriteUpdate
 //   - Calls kvstore.Get(foo), *without* holding a lock on the kvstore
 //   - Gets "key not found"
+// NOTE: run this test with GOMAXPROCS set to >= 2
+// NOTE: this test only fails sporadically, approx ~50% of the time
 func TestWriteUpdateInconsistentRead(t *testing.T) {
+
+	// this is a relatively long running test, so skip it if -short flag passed
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 
 	bucket, tempDir := GetTestBucket()
 
 	defer os.RemoveAll(tempDir)
 	defer CloseBucket(bucket)
 
-	numKeys := 10000
-	// keys := make(chan string, numKeys)
+	// this was chosen to be high enough to make it fail as often as possible
+	// while keeping the test runtime as low as possible.
+	numKeys := 5000
 
 	wg := sync.WaitGroup{}
 	wg.Add(numKeys)
@@ -626,7 +634,7 @@ func TestWriteUpdateInconsistentRead(t *testing.T) {
 			if err := bucket.SetRaw(key, 0, data); err != nil {
 				log.Panicf("Unable to set key: %v", key)
 			}
-			// keys <- key
+
 			go func() {
 				updateFunc := func(current []byte) (updated []byte, err error) {
 					if current == nil {
@@ -648,29 +656,6 @@ func TestWriteUpdateInconsistentRead(t *testing.T) {
 
 	}
 
-	/*
-		go func() {
-			for key := range keys {
-				updateFunc := func(current []byte) (updated []byte, err error) {
-					if current == nil {
-						log.Panicf("should not be nil, we set this value earlier")
-					}
-					if len(current) == 0 {
-						log.Panicf("should not be empty, we set this value earlier")
-					}
-					return current, nil
-				}
-				err := bucket.Update(key, 0, updateFunc)
-				assert.True(t, err == nil)
-				wg.Done()
-
-			}
-			close(keys)
-		}()
-	*/
-
-	log.Printf("Calling wg.Wait()")
 	wg.Wait()
-	log.Printf("/Calling wg.Wait()")
 
 }
