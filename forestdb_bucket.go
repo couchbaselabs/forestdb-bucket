@@ -375,29 +375,59 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 
 	*/
 
-	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
-	if err != nil {
-		log.Printf("WriteUPdate couldn't create new doc: %v", err)
-		return err
-	}
-	defer doc.Close()
+	for {
+		doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+		if err != nil {
+			log.Printf("WriteUPdate couldn't create new doc: %v", err)
+			return err
+		}
+		defer doc.Close()
 
-	err = bucket.kvstore.Get(doc)
-	if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
-		// if it's an unexpected error, return it
-		log.Printf("WriteUpdate got unexpected err calling Get(): %v", err)
-		return err
+		err = bucket.kvstore.Get(doc)
+		if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
+			// if it's an unexpected error, return it
+			log.Printf("WriteUpdate got unexpected err calling Get(): %v", err)
+			return err
+		}
+
+		docBody := doc.Body()
+
+		// workaround hack: in the Delete() method, we set the doc body to nil.
+		// however, when we fetch it, it comes back as an empty slice.  in order
+		// to workaraound that behavior and get the TestDeleteThenUpdate() test to
+		// pass, if docBody is empty, change it to nil
+		if len(docBody) == 0 {
+			docBody = nil
+		}
+
+		// TODO: is copySlice really needed here?
+		docBodyCopy := copySlice(docBody)
+
+		newDocBody, _, err := callback(docBodyCopy)
+		if err != nil {
+			return err
+		}
+
+		// update doc with new body
+		if err := doc.Update(doc.Meta(), newDocBody); err != nil {
+			return err
+		}
+
+		seq, err := bucket.updateDoc(key, doc)
+		if err != nil {
+			return err
+		}
+		log.Printf("updateDoc returned seq: %v err: %v", seq, err)
+
+		if seq > 0 {
+			break
+		}
+
 	}
 
-	docBody := doc.Body()
+	return nil
 
-	// workaround hack: in the Delete() method, we set the doc body to nil.
-	// however, when we fetch it, it comes back as an empty slice.  in order
-	// to workaraound that behavior and get the TestDeleteThenUpdate() test to
-	// pass, if docBody is empty, change it to nil
-	if len(docBody) == 0 {
-		docBody = nil
-	}
+	/* OLD impl
 
 	// TODO: is copySlice really needed here?
 	docBodyCopy := copySlice(docBody)
@@ -413,6 +443,54 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 	}
 
 	return nil
+
+	*/
+
+}
+
+// Replaces a forestdb doc as long as its sequence number hasn't changed yet. (Used by Update)
+func (bucket *forestdbBucket) updateDoc(key string, doc *forestdb.Doc) (seq uint64, err error) {
+	bucket.lock.Lock()
+	defer bucket.lock.Unlock()
+
+	curSequence := uint64(0)
+	curDoc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer curDoc.Close()
+
+	err = bucket.kvstore.Get(curDoc)
+	if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
+		return 0, err
+	}
+	log.Printf("err after looking up doc for key %v: %v", key, err)
+	if err != forestdb.RESULT_KEY_NOT_FOUND {
+		curSequence = uint64(curDoc.SeqNum())
+		log.Printf("found doc, set curSequence to %v", curSequence)
+
+		log.Printf("check if curSequence (%v) == doc.SeqNum (%v)", curSequence, uint64(doc.SeqNum()))
+		if curSequence != uint64(doc.SeqNum()) {
+			return 0, nil
+		}
+
+	}
+
+	log.Printf("setting doc ..")
+
+	// either doc does not already exist, or it's not stale
+	// (eg, it's still at the sequence number our updated doc is based on)
+	// so we can write the new doc.
+	if err := bucket.kvstore.Set(doc); err != nil {
+		return 0, err
+	}
+	if err := bucket.db.Commit(forestdb.COMMIT_NORMAL); err != nil {
+		return 0, err
+	}
+
+	bucket._postTapMutationEvent(key, doc.Body(), uint64(doc.SeqNum()))
+	return uint64(doc.SeqNum()), nil
+
 }
 
 func (bucket *forestdbBucket) Incr(key string, amt, defaultVal uint64, expires int) (uint64, error) {
