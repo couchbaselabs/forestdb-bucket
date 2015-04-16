@@ -355,26 +355,6 @@ func (bucket *forestdbBucket) Update(key string, expires int, callback walrus.Up
 
 func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walrus.WriteUpdateFunc) error {
 
-	/*
-	   walrus:
-
-	   	var err error
-	   	var opts WriteOptions
-	   	var seq uint64
-	   	for {
-	   		var doc lolrusDoc = bucket.getDoc(k)
-	   		doc.Raw, opts, err = callback(copySlice(doc.Raw))
-	   		doc.IsJSON = doc.Raw != nil && ((opts & Raw) == 0)
-	   		if err != nil {
-	   			return err
-	   		} else if seq = bucket.updateDoc(k, &doc); seq > 0 {
-	   			break
-	   		}
-	   	}
-
-
-	*/
-
 	for {
 		doc, err := forestdb.NewDoc([]byte(key), nil, nil)
 		if err != nil {
@@ -417,7 +397,6 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 		if err != nil {
 			return err
 		}
-		log.Printf("updateDoc returned seq: %v err: %v", seq, err)
 
 		if seq > 0 {
 			break
@@ -426,25 +405,6 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 	}
 
 	return nil
-
-	/* OLD impl
-
-	// TODO: is copySlice really needed here?
-	docBodyCopy := copySlice(docBody)
-
-	newDocBody, _, err := callback(docBodyCopy)
-
-	if err != nil {
-		return err
-	}
-
-	if err := bucket.setRaw(key, expires, newDocBody); err != nil {
-		return err
-	}
-
-	return nil
-
-	*/
 
 }
 
@@ -464,19 +424,13 @@ func (bucket *forestdbBucket) updateDoc(key string, doc *forestdb.Doc) (seq uint
 	if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
 		return 0, err
 	}
-	log.Printf("err after looking up doc for key %v: %v", key, err)
 	if err != forestdb.RESULT_KEY_NOT_FOUND {
 		curSequence = uint64(curDoc.SeqNum())
-		log.Printf("found doc, set curSequence to %v", curSequence)
-
-		log.Printf("check if curSequence (%v) == doc.SeqNum (%v)", curSequence, uint64(doc.SeqNum()))
 		if curSequence != uint64(doc.SeqNum()) {
 			return 0, nil
 		}
 
 	}
-
-	log.Printf("setting doc ..")
 
 	// either doc does not already exist, or it's not stale
 	// (eg, it's still at the sequence number our updated doc is based on)

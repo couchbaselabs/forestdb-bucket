@@ -530,7 +530,7 @@ func TestWriteUpdateConsistency(t *testing.T) {
 	defer CloseBucket(bucket)
 
 	key := "key"
-	numIterations := 500
+	numIterations := 50
 
 	updateChan := make(chan int)
 
@@ -582,7 +582,7 @@ func TestWriteUpdateConsistency(t *testing.T) {
 		// log.Printf("update: %v", update)
 
 		// introduce an artificial delay to help reproduce race conditions
-		<-time.After(2 * time.Millisecond)
+		<-time.After(1 * time.Millisecond)
 
 		_, ok := dupeMap[update]
 		if ok {
