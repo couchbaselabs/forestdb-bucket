@@ -506,7 +506,6 @@ func TestCloseTwice(t *testing.T) {
 // - Does a PUT to create a user
 // - Try to update the user
 // - Actual: update fails since cannot find value for key (unexpected)
-// Attempt to reproduce with this test, so far no luck.
 func TestWriteUpdateConsistency(t *testing.T) {
 
 	// failure scenario:
@@ -575,15 +574,17 @@ func TestWriteUpdateConsistency(t *testing.T) {
 	go updateLoopFunc()
 	go updateLoopFunc()
 
+	// the expectation is that all numbers coming across the updateChan
+	// must be monotonically increasing.  If dupes appear, that means the
+	// goroutines are stepping on eachother and doing stale writes
 	dupeMap := map[int]int{}
 	i := 0
 	for update := range updateChan {
-		// make sure we haven't seen this number yet
-		// log.Printf("update: %v", update)
 
 		// introduce an artificial delay to help reproduce race conditions
 		<-time.After(1 * time.Millisecond)
 
+		// make sure we haven't seen this number yet
 		_, ok := dupeMap[update]
 		if ok {
 			log.Panicf("already seen: %v, numbers should be monotonically increasing with no dupes", update)
