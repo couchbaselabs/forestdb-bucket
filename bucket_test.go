@@ -599,3 +599,60 @@ func TestWriteUpdateConsistency(t *testing.T) {
 	}
 
 }
+
+// There is currently a bug where:
+// Goroutine1 calls SetRaw to set doc with key=foo to value=bar
+// Goroutine2 calls WriteUpdate
+//   - Calls kvstore.Get(foo), *without* holding a lock on the kvstore
+//   - Gets "key not found"
+func TestWriteUpdateInconsistentRead(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	numKeys := 1000
+	keys := make(chan string, numKeys)
+
+	go func() {
+		for i := 0; i < numKeys; i++ {
+
+			key := NewUuid()
+			data := []byte(key)
+			if err := bucket.SetRaw(key, 0, data); err != nil {
+				log.Panicf("Unable to set key: %v", key)
+			}
+			keys <- key
+
+		}
+
+	}()
+
+	wg := sync.WaitGroup{}
+	wg.Add(numKeys)
+
+	go func() {
+		for key := range keys {
+			updateFunc := func(current []byte) (updated []byte, err error) {
+				if current == nil {
+					log.Panicf("should not be nil, we set this value earlier")
+				}
+				if len(current) == 0 {
+					log.Panicf("should not be empty, we set this value earlier")
+				}
+				return current, nil
+			}
+			err := bucket.Update(key, 0, updateFunc)
+			assert.True(t, err == nil)
+			wg.Done()
+
+		}
+		close(keys)
+	}()
+
+	log.Printf("Calling wg.Wait()")
+	wg.Wait()
+	log.Printf("/Calling wg.Wait()")
+
+}
