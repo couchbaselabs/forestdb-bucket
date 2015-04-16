@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/couchbaselabs/go.assert"
 	"github.com/couchbaselabs/goforestdb"
@@ -527,8 +528,9 @@ func TestWriteUpdateConsistency(t *testing.T) {
 
 	defer os.RemoveAll(tempDir)
 	defer CloseBucket(bucket)
+
 	key := "key"
-	numIterations := 100
+	numIterations := 500
 
 	updateChan := make(chan int)
 
@@ -567,78 +569,32 @@ func TestWriteUpdateConsistency(t *testing.T) {
 
 			updateChan <- incrementedNum
 		}
-		close(updateChan)
 
 	}
+
 	go updateLoopFunc()
 	go updateLoopFunc()
 
 	dupeMap := map[int]int{}
+	i := 0
 	for update := range updateChan {
-		log.Printf("%v", update)
 		// make sure we haven't seen this number yet
+		// log.Printf("update: %v", update)
+
+		// introduce an artificial delay to help reproduce race conditions
+		<-time.After(2 * time.Millisecond)
+
 		_, ok := dupeMap[update]
 		if ok {
 			log.Panicf("already seen: %v, numbers should be monotonically increasing with no dupes", update)
 		}
 		dupeMap[update] = update
+		i += 1
+		// log.Printf("i: %v", i)
+		if i >= (numIterations * 2) {
+			// we've seen all the numbers, we're done
+			break
+		}
 	}
-
-}
-
-// While running gateload, seeing an error where:
-// - Does a PUT to create a user
-// - Try to update the user
-// - Actual: update fails since cannot find value for key (unexpected)
-// Attempt to reproduce with this test, so far no luck.
-func DELETEMETestUpdateConsistency(t *testing.T) {
-
-	bucket, tempDir := GetTestBucket()
-
-	defer os.RemoveAll(tempDir)
-	defer CloseBucket(bucket)
-
-	keys := make(chan string)
-	defer close(keys)
-	numKeys := 10000
-
-	go func() {
-		for i := 0; i < numKeys; i++ {
-
-			key := NewUuid()
-			data := []byte(key)
-			if err := bucket.SetRaw(key, 0, data); err != nil {
-				log.Panicf("Unable to set key: %v", key)
-			}
-			keys <- key
-
-		}
-
-	}()
-
-	wg := sync.WaitGroup{}
-	wg.Add(numKeys)
-
-	go func() {
-		for key := range keys {
-			updateFunc := func(current []byte) (updated []byte, err error) {
-				if current == nil {
-					log.Panicf("should not be nil, we set this value earlier")
-				}
-				if len(current) == 0 {
-					log.Panicf("should not be empty, we set this value earlier")
-				}
-				return current, nil
-			}
-			err := bucket.Update(key, 0, updateFunc)
-			assert.True(t, err == nil)
-			wg.Done()
-
-		}
-	}()
-
-	log.Printf("Calling wg.Wait()")
-	wg.Wait()
-	log.Printf("/Calling wg.Wait()")
 
 }

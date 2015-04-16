@@ -355,9 +355,25 @@ func (bucket *forestdbBucket) Update(key string, expires int, callback walrus.Up
 
 func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walrus.WriteUpdateFunc) error {
 
-	// can't lock here, because setRaw locks below ..
-	// bucket.lock.Lock()
-	// defer bucket.lock.Unlock()
+	/*
+	   walrus:
+
+	   	var err error
+	   	var opts WriteOptions
+	   	var seq uint64
+	   	for {
+	   		var doc lolrusDoc = bucket.getDoc(k)
+	   		doc.Raw, opts, err = callback(copySlice(doc.Raw))
+	   		doc.IsJSON = doc.Raw != nil && ((opts & Raw) == 0)
+	   		if err != nil {
+	   			return err
+	   		} else if seq = bucket.updateDoc(k, &doc); seq > 0 {
+	   			break
+	   		}
+	   	}
+
+
+	*/
 
 	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
 	if err != nil {
