@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -497,5 +498,147 @@ func TestCloseTwice(t *testing.T) {
 	} else {
 		log.Fatalf("Bucket does not support Deletable interface")
 	}
+
+}
+
+// While running gateload, seeing an error where:
+// - Does a PUT to create a user
+// - Try to update the user
+// - Actual: update fails since cannot find value for key (unexpected)
+// Attempt to reproduce with this test, so far no luck.
+func TestWriteUpdateConsistency(t *testing.T) {
+
+	// failure scenario:
+	// set docId=foo to value=bar
+	// goroutine1 calls WriteUpdate on docId=foo
+	// goroutine1 calls Get(), doc is at seq=1
+	// goroutine2 calls SetRaw(foo, bar2)
+	// goroutine1 calls callback with currentVal=bar (stale!!)
+	//   Error: goroutine1 ignores the value set by goroutine2,
+	//          and is doing update on a stale value
+
+	// reproduce:
+	// - two goroutines which have update functions that increment
+	// value by 1 and emit new value to a channel
+	// - listener which makes sure that every update is monontonically increaseing, ie:
+	//   if there two updates from 1->2, that means that there was a stale update
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+	key := "key"
+	numIterations := 100
+
+	updateChan := make(chan int)
+
+	// set the value to 0 to start with
+	added, err := bucket.AddRaw(key, 0, []byte("0"))
+	if !added || err != nil {
+		log.Panicf("failed to add value")
+	}
+
+	updateLoopFunc := func() {
+		for i := 0; i < numIterations; i++ {
+
+			incrementedNum := -1
+			currentNum := -1
+			updateFunc := func(current []byte) (updated []byte, err error) {
+				if current == nil {
+					log.Panicf("should not be nil, we set this value earlier")
+				}
+				if len(current) == 0 {
+					log.Panicf("should not be empty, we set this value earlier")
+				}
+				currentStr := string(current)
+				currentNum, err = strconv.Atoi(currentStr)
+				if err != nil {
+					log.Panicf("unexpected error doing Atoi: %v", err)
+				}
+				incrementedNum = currentNum + 1
+				incrementedNumStr := fmt.Sprintf("%v", incrementedNum)
+				return []byte(incrementedNumStr), nil
+			}
+
+			err := bucket.Update(key, 0, updateFunc)
+			if err != nil {
+				log.Panicf("unexpected error updating bucket: %v", err)
+			}
+
+			updateChan <- incrementedNum
+		}
+		close(updateChan)
+
+	}
+	go updateLoopFunc()
+	go updateLoopFunc()
+
+	dupeMap := map[int]int{}
+	for update := range updateChan {
+		log.Printf("%v", update)
+		// make sure we haven't seen this number yet
+		_, ok := dupeMap[update]
+		if ok {
+			log.Panicf("already seen: %v, numbers should be monotonically increasing with no dupes", update)
+		}
+		dupeMap[update] = update
+	}
+
+}
+
+// While running gateload, seeing an error where:
+// - Does a PUT to create a user
+// - Try to update the user
+// - Actual: update fails since cannot find value for key (unexpected)
+// Attempt to reproduce with this test, so far no luck.
+func DELETEMETestUpdateConsistency(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	keys := make(chan string)
+	defer close(keys)
+	numKeys := 10000
+
+	go func() {
+		for i := 0; i < numKeys; i++ {
+
+			key := NewUuid()
+			data := []byte(key)
+			if err := bucket.SetRaw(key, 0, data); err != nil {
+				log.Panicf("Unable to set key: %v", key)
+			}
+			keys <- key
+
+		}
+
+	}()
+
+	wg := sync.WaitGroup{}
+	wg.Add(numKeys)
+
+	go func() {
+		for key := range keys {
+			updateFunc := func(current []byte) (updated []byte, err error) {
+				if current == nil {
+					log.Panicf("should not be nil, we set this value earlier")
+				}
+				if len(current) == 0 {
+					log.Panicf("should not be empty, we set this value earlier")
+				}
+				return current, nil
+			}
+			err := bucket.Update(key, 0, updateFunc)
+			assert.True(t, err == nil)
+			wg.Done()
+
+		}
+	}()
+
+	log.Printf("Calling wg.Wait()")
+	wg.Wait()
+	log.Printf("/Calling wg.Wait()")
 
 }
