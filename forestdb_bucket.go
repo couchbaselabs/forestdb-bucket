@@ -363,9 +363,11 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 		}
 		defer doc.Close()
 
-		// bucket.lock.Lock()
+		// needed to pass TestWriteUpdateInconsistentRead
+		// TODO: is there a cleaner way?
+		bucket.lock.Lock()
 		err = bucket.kvstore.Get(doc)
-		// bucket.lock.Unlock()
+		bucket.lock.Unlock()
 
 		if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
 			// if it's an unexpected error, return it
