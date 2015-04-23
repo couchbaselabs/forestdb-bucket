@@ -396,13 +396,16 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 			return err
 		}
 
-		switch newDocBody {
-		case nil:
+		if docBody != nil && newDocBody == nil {
+			// if the original doc body was not nil, but the callback returns a nil
+			// newDocBody, then it appears that the callback is trying to delete
+			// the doc.  (this is needed so that TestDeleteViaUpdate() passes)
 			if err := bucket.Delete(key); err != nil {
 				return err
 			}
 			return nil
-		default:
+
+		} else {
 			// update doc with new body
 			if err := doc.Update(doc.Meta(), newDocBody); err != nil {
 				return err
