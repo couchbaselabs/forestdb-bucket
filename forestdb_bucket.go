@@ -396,18 +396,27 @@ func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walr
 			return err
 		}
 
-		// update doc with new body
-		if err := doc.Update(doc.Meta(), newDocBody); err != nil {
-			return err
-		}
+		switch newDocBody {
+		case nil:
+			if err := bucket.Delete(key); err != nil {
+				return err
+			}
+			return nil
+		default:
+			// update doc with new body
+			if err := doc.Update(doc.Meta(), newDocBody); err != nil {
+				return err
+			}
 
-		seq, err := bucket.updateDoc(key, doc)
-		if err != nil {
-			return err
-		}
+			seq, err := bucket.updateDoc(key, doc)
+			if err != nil {
+				return err
+			}
 
-		if seq > 0 {
-			break
+			if seq > 0 {
+				break
+			}
+
 		}
 
 	}
