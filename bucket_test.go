@@ -223,6 +223,36 @@ func TestDurableAdd(t *testing.T) {
 
 }
 
+func TestDeleteViaUpdate(t *testing.T) {
+
+	var value interface{}
+	var value2 interface{}
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	// Add
+	added, err := bucket.Add("key", 0, "value")
+	assertNoError(t, err, "Add")
+	assert.True(t, added)
+	assertNoError(t, bucket.Get("key", &value), "Get")
+	assert.Equals(t, value, "value")
+
+	// Delete via Update func that returns nil, nil
+	updateFunc := func(current []byte) (updated []byte, err error) {
+		return nil, nil
+	}
+	err = bucket.Update("key", 0, updateFunc)
+
+	// Get -- should return MissingKeyError
+	err = bucket.Get("key", &value2)
+	_, ok := err.(walrus.MissingError)
+	assert.True(t, ok)
+
+}
+
 func TestDeleteThenAdd(t *testing.T) {
 
 	bucket, tempDir := GetTestBucket()
