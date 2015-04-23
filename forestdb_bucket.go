@@ -331,6 +331,9 @@ func (bucket *forestdbBucket) Delete(key string) error {
 	if err := bucket.kvstore.Set(doc); err != nil {
 		return err
 	}
+	if err := bucket.db.Commit(forestdb.COMMIT_NORMAL); err != nil {
+		return err
+	}
 
 	// Post a TAP notification:
 	bucket._postTapDeletionEvent(key, uint64(doc.SeqNum()))
