@@ -8,7 +8,6 @@ import (
 	"github.com/couchbaselabs/walrus"
 )
 
-// Disabled since the backfill stuff is not implemented yet
 func TestBackfill(t *testing.T) {
 
 	bucket, tempDir := GetTestBucket()
@@ -40,6 +39,19 @@ func TestBackfill(t *testing.T) {
 
 	event, ok := <-feed.Events()
 	assert.False(t, ok)
+}
+
+func TestBackfillEmptyBucket(t *testing.T) {
+
+	bucket, tempDir := GetTestBucket()
+
+	defer os.RemoveAll(tempDir)
+	defer CloseBucket(bucket)
+
+	feed, err := bucket.StartTapFeed(walrus.TapArguments{Backfill: 0, Dump: true})
+	assertNoError(t, err, "StartTapFeed failed")
+	assert.True(t, feed != nil)
+
 }
 
 func TestMutations(t *testing.T) {

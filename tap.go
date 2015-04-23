@@ -98,7 +98,13 @@ func (bucket *forestdbBucket) enqueueBackfillEvents(startSequence uint64, keysOn
 
 	for {
 		doc, err := iterator.Get()
+		if err == forestdb.RESULT_ITERATOR_FAIL {
+			// we're done, there's nothing in the bucket
+			return nil
+		}
+
 		if err != nil {
+			// unexpected error, return it
 			return err
 		}
 		if doc.Body() != nil && uint64(doc.SeqNum()) >= startSequence {
