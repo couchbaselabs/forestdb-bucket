@@ -172,6 +172,7 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		// TODO: this should return an error instead
 		log.Panicf("Could not create forestdb iterator on: %v", bucket)
 	}
+	defer iterator.Close()
 
 	for {
 		doc, err := iterator.Get()
@@ -192,6 +193,11 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 			}
 
 		}
+
+		// close the doc to release resources.
+		// without this call, this will become a memory leak.
+		// it is very hard to track down since it will be cgo "dark memory".
+		doc.Close()
 
 		if err := iterator.Next(); err != nil {
 			// we're done.
@@ -220,8 +226,10 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 	result.Collator.Clear() // don't keep collation state around
 
 	view.lastIndexedSequence = lastSeq
+
 	view.index = result
 	return view.index
+
 }
 
 func (bucket *forestdbBucket) GetDDoc(docname string, into interface{}) error {

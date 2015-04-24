@@ -45,7 +45,11 @@ func NewBucket(bucketRootPath, poolName, bucketName string) (walrus.Bucket, erro
 	}
 
 	// open forestdb database file
-	db, err := forestdb.Open(bucket.bucketDbFilePath(), nil)
+	config := forestdb.DefaultConfig()
+	db, err := forestdb.Open(
+		bucket.bucketDbFilePath(),
+		config,
+	)
 	if err != nil {
 		return nil, err
 	}
