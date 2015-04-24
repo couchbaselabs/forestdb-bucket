@@ -1,0 +1,6 @@
+PASS
+BenchmarkOpenCloseBucket	    2000	    849436 ns/op	   22794 B/op	     149 allocs/op
+BenchmarkGet	 1000000	      1977 ns/op	     352 B/op	      15 allocs/op
+BenchmarkParallelAddGet	   10000	    120710 ns/op	    1917 B/op	      57 allocs/op
+BenchmarkView	    1000	  10823907 ns/op	 3420816 B/op	   73162 allocs/op
+ok  	github.com/couchbaselabs/forestdb-bucket	16.037s
