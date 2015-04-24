@@ -13,6 +13,27 @@ import (
 	"github.com/nu7hatch/gouuid"
 )
 
+func assertNoError(t *testing.T, err error, message string) {
+	if err != nil {
+		t.Fatalf("%s: %v", message, err)
+	}
+}
+
+func assertTrue(t *testing.T, success bool, message string) {
+	if !success {
+		t.Fatalf("%s", message)
+	}
+}
+
+func setJSON(bucket walrus.Bucket, docid string, jsonDoc string) error {
+	var obj interface{}
+	err := json.Unmarshal([]byte(jsonDoc), &obj)
+	if err != nil {
+		return err
+	}
+	return bucket.Set(docid, 0, obj)
+}
+
 func GetTestBucket() (bucket walrus.Bucket, tempDir string) {
 
 	bucketUuid := NewUuid()
@@ -43,23 +64,24 @@ func NewUuid() string {
 	return fmt.Sprintf("%s", u4)
 }
 
-func assertNoError(t *testing.T, err error, message string) {
-	if err != nil {
-		t.Fatalf("%s: %v", message, err)
-	}
+func AddTestDocQueryView(bucket walrus.Bucket, i int) {
+
+	key := AddTestDoc(bucket, i)
+	QueryTestView(bucket, i, key)
+
 }
 
-func assertTrue(t *testing.T, success bool, message string) {
-	if !success {
-		t.Fatalf("%s", message)
-	}
-}
+func AddTestDoc(bucket walrus.Bucket, i int) string {
 
-func setJSON(bucket walrus.Bucket, docid string, jsonDoc string) error {
-	var obj interface{}
-	err := json.Unmarshal([]byte(jsonDoc), &obj)
+	// add doc to bucket
+	docId := fmt.Sprintf("doc-%v", i)
+	key := fmt.Sprintf("key-%v", i)
+	value := fmt.Sprintf("val-%v", i)
+	jsonStr := fmt.Sprintf(`{"key": "%v", "value": "%v"}`, key, value)
+	err := setJSON(bucket, docId, jsonStr)
 	if err != nil {
-		return err
+		panic("Failed to put doc")
 	}
-	return bucket.Set(docid, 0, obj)
+	return key
+
 }
