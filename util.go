@@ -3,7 +3,6 @@ package forestbucket
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/url"
 
 	"github.com/couchbaselabs/walrus"
@@ -71,10 +70,9 @@ func QueryTestView(bucket walrus.Bucket, i int, key string) {
 		"key":   key,
 		"stale": false,
 	}
-	result, err := bucket.View("docname", "view1", options)
+	_, err := bucket.View("docname", "view1", options)
 	if err != nil {
 		panic("Failed to query view")
 	}
-	log.Printf("result: %v", result)
 
 }

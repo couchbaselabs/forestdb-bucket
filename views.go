@@ -111,7 +111,6 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 	if view.lastIndexedSequence >= toSequence {
 		return view.index
 	}
-	log.Printf("\t... updating index to seq %d (from %d)", toSequence, view.lastIndexedSequence)
 
 	result.Rows = make([]*walrus.ViewRow, 0)
 	result.Errors = make([]walrus.ViewError, 0)
@@ -157,20 +156,19 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		}
 	}()
 
-	// TODO: this should be starting from view.lastIndexedSequence
-	startSequence := 0
+	// start indexing from where we last left off
+	startSequence := view.lastIndexedSequence
 
 	// create an iterator
 	options := forestdb.ITR_NONE
-	endSeq := forestdb.SeqNum(0) // is this how to specify no end sequence?
 	iterator, err := bucket.kvstore.IteratorSequenceInit(
 		forestdb.SeqNum(startSequence),
-		endSeq,
+		forestdb.SeqNum(lastSeq),
 		options,
 	)
 	if err != nil {
 		// TODO: this should return an error instead
-		log.Panicf("Could not create forestdb iterator on: %v", bucket)
+		log.Panicf("Could not create forestdb iterator on: %v.  Err: %v", bucket, err)
 	}
 	defer iterator.Close()
 
@@ -222,7 +220,10 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		}
 	}
 
+	// TODO: this is a huge bottleneck that will be fixed when using
+	// forestdb to store views
 	sort.Sort(&result)
+
 	result.Collator.Clear() // don't keep collation state around
 
 	view.lastIndexedSequence = lastSeq
