@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/couchbase/sg-bucket"
 	"github.com/couchbaselabs/go.assert"
-	"github.com/couchbaselabs/walrus"
 )
 
 // Create a simple view and run it on some documents
@@ -17,9 +17,9 @@ func TestView(t *testing.T) {
 	defer CloseBucket(bucket)
 
 	mapFunc := `function(doc){if (doc.key) emit(doc.key,doc.value)}`
-	ddoc := walrus.DesignDoc{
-		Views: walrus.ViewMap{
-			"view1": walrus.ViewDef{
+	ddoc := sgbucket.DesignDoc{
+		Views: sgbucket.ViewMap{
+			"view1": sgbucket.ViewDef{
 				Map: mapFunc,
 			},
 		},
@@ -28,7 +28,7 @@ func TestView(t *testing.T) {
 	err := bucket.PutDDoc("docname", ddoc)
 	assertNoError(t, err, "PutDDoc failed")
 
-	var echo walrus.DesignDoc
+	var echo sgbucket.DesignDoc
 	err = bucket.GetDDoc("docname", &echo)
 	assert.DeepEquals(t, echo, ddoc)
 
@@ -46,11 +46,11 @@ func TestView(t *testing.T) {
 	result, err := bucket.View("docname", "view1", options)
 	assertNoError(t, err, "View call failed")
 	assert.Equals(t, result.TotalRows, 5)
-	assert.DeepEquals(t, result.Rows[0], &walrus.ViewRow{ID: "doc3", Key: 17.0, Value: []interface{}{"v3"}})
-	assert.DeepEquals(t, result.Rows[1], &walrus.ViewRow{ID: "doc1", Key: "k1", Value: "v1"})
-	assert.DeepEquals(t, result.Rows[2], &walrus.ViewRow{ID: "doc2", Key: "k2", Value: "v2"})
-	assert.DeepEquals(t, result.Rows[3], &walrus.ViewRow{ID: "doc4", Key: []interface{}{17.0, false}})
-	assert.DeepEquals(t, result.Rows[4], &walrus.ViewRow{ID: "doc5", Key: []interface{}{17.0, true}})
+	assert.DeepEquals(t, result.Rows[0], &sgbucket.ViewRow{ID: "doc3", Key: 17.0, Value: []interface{}{"v3"}})
+	assert.DeepEquals(t, result.Rows[1], &sgbucket.ViewRow{ID: "doc1", Key: "k1", Value: "v1"})
+	assert.DeepEquals(t, result.Rows[2], &sgbucket.ViewRow{ID: "doc2", Key: "k2", Value: "v2"})
+	assert.DeepEquals(t, result.Rows[3], &sgbucket.ViewRow{ID: "doc4", Key: []interface{}{17.0, false}})
+	assert.DeepEquals(t, result.Rows[4], &sgbucket.ViewRow{ID: "doc5", Key: []interface{}{17.0, true}})
 
 	// Try a ViewCustom query
 	customResult := map[string]interface{}{}
@@ -69,7 +69,7 @@ func TestView(t *testing.T) {
 	assertNoError(t, err, "View call failed")
 	assert.Equals(t, result.TotalRows, 3)
 	var expectedDoc interface{} = map[string]interface{}{"key": "k2", "value": "v2"}
-	assert.DeepEquals(t, result.Rows[0], &walrus.ViewRow{ID: "doc2", Key: "k2", Value: "v2",
+	assert.DeepEquals(t, result.Rows[0], &sgbucket.ViewRow{ID: "doc2", Key: "k2", Value: "v2",
 		Doc: &expectedDoc})
 
 	// Try an endkey:
@@ -77,7 +77,7 @@ func TestView(t *testing.T) {
 	result, err = bucket.View("docname", "view1", options)
 	assertNoError(t, err, "View call failed")
 	assert.Equals(t, result.TotalRows, 1)
-	assert.DeepEquals(t, result.Rows[0], &walrus.ViewRow{ID: "doc2", Key: "k2", Value: "v2",
+	assert.DeepEquals(t, result.Rows[0], &sgbucket.ViewRow{ID: "doc2", Key: "k2", Value: "v2",
 		Doc: &expectedDoc})
 
 	// Try an endkey out of range:
@@ -85,7 +85,7 @@ func TestView(t *testing.T) {
 	result, err = bucket.View("docname", "view1", options)
 	assertNoError(t, err, "View call failed")
 	assert.Equals(t, result.TotalRows, 1)
-	assert.DeepEquals(t, result.Rows[0], &walrus.ViewRow{ID: "doc2", Key: "k2", Value: "v2",
+	assert.DeepEquals(t, result.Rows[0], &sgbucket.ViewRow{ID: "doc2", Key: "k2", Value: "v2",
 		Doc: &expectedDoc})
 
 	// Try without inclusive_end:
@@ -100,12 +100,12 @@ func TestView(t *testing.T) {
 	result, err = bucket.View("docname", "view1", options)
 	assertNoError(t, err, "View call failed")
 	assert.Equals(t, result.TotalRows, 1)
-	assert.DeepEquals(t, result.Rows[0], &walrus.ViewRow{ID: "doc2", Key: "k2", Value: "v2",
+	assert.DeepEquals(t, result.Rows[0], &sgbucket.ViewRow{ID: "doc2", Key: "k2", Value: "v2",
 		Doc: &expectedDoc})
 
 	// Delete the design doc:
 	assertNoError(t, bucket.DeleteDDoc("docname"), "DeleteDDoc")
-	assert.DeepEquals(t, bucket.GetDDoc("docname", &echo), walrus.MissingError{Key: "docname"})
+	assert.DeepEquals(t, bucket.GetDDoc("docname", &echo), sgbucket.MissingError{Key: "docname"})
 }
 
 func BenchmarkView(b *testing.B) {

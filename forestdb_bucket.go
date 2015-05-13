@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/couchbase/sg-bucket"
 	"github.com/couchbaselabs/goforestdb"
-	"github.com/couchbaselabs/walrus"
 )
 
 type forestdbBucket struct {
@@ -26,7 +26,7 @@ type forestdbBucket struct {
 }
 
 // Creates a new ForestDB bucket
-func NewBucket(bucketRootPath, poolName, bucketName string) (walrus.Bucket, error) {
+func NewBucket(bucketRootPath, poolName, bucketName string) (sgbucket.Bucket, error) {
 
 	log.Printf("forestdb NewBucket() with path: %v, pool: %v, name: %v", bucketRootPath, poolName, bucketName)
 
@@ -119,7 +119,7 @@ func (b *forestdbBucket) bucketDbFilePath() string {
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-// walrus.Bucket interface methods
+// sgbucket.Bucket interface methods
 
 func (bucket *forestdbBucket) GetName() string {
 	return bucket.name
@@ -141,7 +141,7 @@ func (bucket *forestdbBucket) Get(key string, returnVal interface{}) error {
 	err = bucket.kvstore.Get(doc)
 	if err != nil {
 		if err == forestdb.RESULT_KEY_NOT_FOUND {
-			return walrus.MissingError{
+			return sgbucket.MissingError{
 				Key: key,
 			}
 		}
@@ -154,7 +154,7 @@ func (bucket *forestdbBucket) Get(key string, returnVal interface{}) error {
 	// Delete() shouldn't just call ForestDB delete, rather than trying
 	// to set to a nil value.  (See https://github.com/couchbase/goforestdb/issues/15)
 	if doc.Body() == nil || len(doc.Body()) == 0 {
-		return walrus.MissingError{
+		return sgbucket.MissingError{
 			Key: key,
 		}
 	}
@@ -181,7 +181,7 @@ func (bucket *forestdbBucket) GetRaw(key string) ([]byte, error) {
 	err = bucket.kvstore.Get(doc)
 	if err != nil {
 		if err == forestdb.RESULT_KEY_NOT_FOUND {
-			return nil, walrus.MissingError{
+			return nil, sgbucket.MissingError{
 				Key: key,
 			}
 		}
@@ -219,7 +219,7 @@ func (bucket *forestdbBucket) AddRaw(key string, expires int, value []byte) (add
 		return false, err
 	}
 	if exists {
-		return false, walrus.ErrKeyExists
+		return false, sgbucket.ErrKeyExists
 	}
 
 	if err := bucket.setRaw(
@@ -274,7 +274,7 @@ func (bucket *forestdbBucket) Append(key string, data []byte) error {
 	err = bucket.kvstore.Get(doc)
 	if err != nil {
 		if err == forestdb.RESULT_KEY_NOT_FOUND {
-			return walrus.MissingError{
+			return sgbucket.MissingError{
 				Key: key,
 			}
 		}
@@ -346,21 +346,21 @@ func (bucket *forestdbBucket) Delete(key string) error {
 
 }
 
-func (bucket *forestdbBucket) Write(key string, flags int, expires int, value interface{}, opt walrus.WriteOptions) error {
+func (bucket *forestdbBucket) Write(key string, flags int, expires int, value interface{}, opt sgbucket.WriteOptions) error {
 	log.Panicf("Write not implemented")
 	return nil
 }
 
-func (bucket *forestdbBucket) Update(key string, expires int, callback walrus.UpdateFunc) error {
+func (bucket *forestdbBucket) Update(key string, expires int, callback sgbucket.UpdateFunc) error {
 
-	writeCallback := func(current []byte) (updated []byte, opts walrus.WriteOptions, err error) {
+	writeCallback := func(current []byte) (updated []byte, opts sgbucket.WriteOptions, err error) {
 		updated, err = callback(current)
 		return
 	}
 	return bucket.WriteUpdate(key, expires, writeCallback)
 }
 
-func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback walrus.WriteUpdateFunc) error {
+func (bucket *forestdbBucket) WriteUpdate(key string, expires int, callback sgbucket.WriteUpdateFunc) error {
 
 	for {
 		doc, err := forestdb.NewDoc([]byte(key), nil, nil)
@@ -503,7 +503,7 @@ func (bucket *forestdbBucket) Incr(key string, amt, defaultVal uint64, expires i
 		counter += amt
 	} else {
 		if expires < 0 {
-			return 0, walrus.MissingError{
+			return 0, sgbucket.MissingError{
 				Key: key,
 			}
 		}
@@ -572,7 +572,7 @@ func (bucket *forestdbBucket) VBHash(docID string) uint32 {
 	return 0
 }
 
-// End walrus.Bucket interface methods
+// End sgbucket.Bucket interface methods
 
 ////////////////////////////////////////////////////////////////////////////////////
 

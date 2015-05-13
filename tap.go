@@ -1,22 +1,22 @@
 package forestbucket
 
 import (
+	"github.com/couchbase/sg-bucket"
 	"github.com/couchbaselabs/go-safe-dstruct/queue"
 	"github.com/couchbaselabs/goforestdb"
-	"github.com/couchbaselabs/walrus"
 )
 
 type tapFeedImpl struct {
 	bucket  *forestdbBucket
-	channel chan walrus.TapEvent
-	args    walrus.TapArguments
+	channel chan sgbucket.TapEvent
+	args    sgbucket.TapArguments
 	events  *queue.Queue
 }
 
 // Starts a TAP feed on a client connection. The events can be read from the returned channel.
 // To stop receiving events, call Close() on the feed.
-func (bucket *forestdbBucket) StartTapFeed(args walrus.TapArguments) (walrus.TapFeed, error) {
-	channel := make(chan walrus.TapEvent, 10)
+func (bucket *forestdbBucket) StartTapFeed(args sgbucket.TapArguments) (sgbucket.TapFeed, error) {
+	channel := make(chan sgbucket.TapEvent, 10)
 	feed := &tapFeedImpl{
 		bucket:  bucket,
 		channel: channel,
@@ -24,15 +24,15 @@ func (bucket *forestdbBucket) StartTapFeed(args walrus.TapArguments) (walrus.Tap
 		events:  queue.NewQueue(),
 	}
 
-	if args.Backfill != walrus.TapNoBackfill {
-		feed.events.Push(&walrus.TapEvent{Opcode: walrus.TapBeginBackfill})
+	if args.Backfill != sgbucket.TapNoBackfill {
+		feed.events.Push(&sgbucket.TapEvent{Opcode: sgbucket.TapBeginBackfill})
 		if err := bucket.enqueueBackfillEvents(
 			args.Backfill,
 			args.KeysOnly,
 			feed.events); err != nil {
 			return nil, err
 		}
-		feed.events.Push(&walrus.TapEvent{Opcode: walrus.TapEndBackfill})
+		feed.events.Push(&sgbucket.TapEvent{Opcode: sgbucket.TapEndBackfill})
 	}
 
 	if args.Dump {
@@ -49,7 +49,7 @@ func (bucket *forestdbBucket) StartTapFeed(args walrus.TapArguments) (walrus.Tap
 	return feed, nil
 }
 
-func (feed *tapFeedImpl) Events() <-chan walrus.TapEvent {
+func (feed *tapFeedImpl) Events() <-chan sgbucket.TapEvent {
 	return feed.channel
 }
 
@@ -71,7 +71,7 @@ func (feed *tapFeedImpl) Close() error {
 func (feed *tapFeedImpl) run() {
 	defer close(feed.channel)
 	for {
-		event, _ := feed.events.Pull().(*walrus.TapEvent)
+		event, _ := feed.events.Pull().(*sgbucket.TapEvent)
 		if event == nil {
 			break
 		}
@@ -108,8 +108,8 @@ func (bucket *forestdbBucket) enqueueBackfillEvents(startSequence uint64, keysOn
 			return err
 		}
 		if doc.Body() != nil && uint64(doc.SeqNum()) >= startSequence {
-			event := walrus.TapEvent{
-				Opcode:   walrus.TapMutation,
+			event := sgbucket.TapEvent{
+				Opcode:   sgbucket.TapMutation,
 				Key:      doc.Key(),
 				Sequence: uint64(doc.SeqNum()),
 			}
@@ -128,8 +128,8 @@ func (bucket *forestdbBucket) enqueueBackfillEvents(startSequence uint64, keysOn
 }
 
 // Caller must have the bucket's RLock, because this method iterates bucket.tapFeeds
-func (bucket *forestdbBucket) _postTapEvent(event walrus.TapEvent) {
-	var eventNoValue walrus.TapEvent = event // copies the struct
+func (bucket *forestdbBucket) _postTapEvent(event sgbucket.TapEvent) {
+	var eventNoValue sgbucket.TapEvent = event // copies the struct
 	eventNoValue.Value = nil
 
 	for _, feed := range bucket.tapFeeds {
@@ -145,8 +145,8 @@ func (bucket *forestdbBucket) _postTapEvent(event walrus.TapEvent) {
 
 func (bucket *forestdbBucket) _postTapMutationEvent(key string, value []byte, seq uint64) {
 
-	bucket._postTapEvent(walrus.TapEvent{
-		Opcode:   walrus.TapMutation,
+	bucket._postTapEvent(sgbucket.TapEvent{
+		Opcode:   sgbucket.TapMutation,
 		Key:      []byte(key),
 		Value:    copySlice(value),
 		Sequence: seq,
@@ -154,8 +154,8 @@ func (bucket *forestdbBucket) _postTapMutationEvent(key string, value []byte, se
 }
 
 func (bucket *forestdbBucket) _postTapDeletionEvent(key string, seq uint64) {
-	bucket._postTapEvent(walrus.TapEvent{
-		Opcode:   walrus.TapDeletion,
+	bucket._postTapEvent(sgbucket.TapEvent{
+		Opcode:   sgbucket.TapDeletion,
 		Key:      []byte(key),
 		Sequence: seq,
 	})

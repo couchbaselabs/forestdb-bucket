@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/couchbaselabs/walrus"
+	"github.com/couchbase/sg-bucket"
 )
 
 // Interprets a bucket urlStr as a directory, or returns an error if it's not.
@@ -44,13 +44,13 @@ func isJSON(raw []byte) bool {
 
 // Add benchmark related code here so it can be re-used in an actual benchmark
 // as well as in util/benchmark_webserver
-func AddTestDesignDoc(bucket walrus.Bucket) {
+func AddTestDesignDoc(bucket sgbucket.Bucket) {
 
 	// add design doc and map
 	mapFunc := `function(doc){if (doc.key) emit(doc.key,doc.value)}`
-	ddoc := walrus.DesignDoc{
-		Views: walrus.ViewMap{
-			"view1": walrus.ViewDef{
+	ddoc := sgbucket.DesignDoc{
+		Views: sgbucket.ViewMap{
+			"view1": sgbucket.ViewDef{
 				Map: mapFunc,
 			},
 		},
@@ -63,7 +63,7 @@ func AddTestDesignDoc(bucket walrus.Bucket) {
 
 }
 
-func QueryTestView(bucket walrus.Bucket, i int, key string) {
+func QueryTestView(bucket sgbucket.Bucket, i int, key string) {
 
 	// query view for doc
 	options := map[string]interface{}{

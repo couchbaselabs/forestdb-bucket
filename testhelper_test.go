@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/couchbase/sg-bucket"
 	"github.com/couchbaselabs/logg"
-	"github.com/couchbaselabs/walrus"
 	"github.com/nu7hatch/gouuid"
 )
 
@@ -25,7 +25,7 @@ func assertTrue(t *testing.T, success bool, message string) {
 	}
 }
 
-func setJSON(bucket walrus.Bucket, docid string, jsonDoc string) error {
+func setJSON(bucket sgbucket.Bucket, docid string, jsonDoc string) error {
 	var obj interface{}
 	err := json.Unmarshal([]byte(jsonDoc), &obj)
 	if err != nil {
@@ -34,7 +34,7 @@ func setJSON(bucket walrus.Bucket, docid string, jsonDoc string) error {
 	return bucket.Set(docid, 0, obj)
 }
 
-func GetTestBucket() (bucket walrus.Bucket, tempDir string) {
+func GetTestBucket() (bucket sgbucket.Bucket, tempDir string) {
 
 	bucketUuid := NewUuid()
 	tempDir = filepath.Join(os.TempDir(), bucketUuid)
@@ -64,14 +64,14 @@ func NewUuid() string {
 	return fmt.Sprintf("%s", u4)
 }
 
-func AddTestDocQueryView(bucket walrus.Bucket, i int) {
+func AddTestDocQueryView(bucket sgbucket.Bucket, i int) {
 
 	key := AddTestDoc(bucket, i)
 	QueryTestView(bucket, i, key)
 
 }
 
-func AddTestDoc(bucket walrus.Bucket, i int) string {
+func AddTestDoc(bucket sgbucket.Bucket, i int) string {
 
 	// add doc to bucket
 	docId := fmt.Sprintf("doc-%v", i)

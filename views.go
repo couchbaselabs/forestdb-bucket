@@ -6,22 +6,22 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/couchbase/sg-bucket"
 	"github.com/couchbaselabs/goforestdb"
-	"github.com/couchbaselabs/walrus"
 )
 
 // A single view stored in a forestdb bucket.
 type forestdbView struct {
-	mapFunction         *walrus.JSMapFunction // The compiled map function
-	reduceFunction      string                // The source of the reduce function (if any)
-	index               walrus.ViewResult     // The latest complete result
-	lastIndexedSequence uint64                // Bucket's lastSeq at the time the index was built
+	mapFunction         *sgbucket.JSMapFunction // The compiled map function
+	reduceFunction      string                  // The source of the reduce function (if any)
+	index               sgbucket.ViewResult     // The latest complete result
+	lastIndexedSequence uint64                  // Bucket's lastSeq at the time the index was built
 }
 
 // Stores view functions for use by a forestdb bucket.
 type forestdbDesignDoc map[string]*forestdbView
 
-func (bucket *forestdbBucket) View(docName, viewName string, params map[string]interface{}) (walrus.ViewResult, error) {
+func (bucket *forestdbBucket) View(docName, viewName string, params map[string]interface{}) (sgbucket.ViewResult, error) {
 
 	stale := true
 	if params != nil {
@@ -31,20 +31,20 @@ func (bucket *forestdbBucket) View(docName, viewName string, params map[string]i
 	}
 
 	// Look up the view and its index:
-	var result walrus.ViewResult
+	var result sgbucket.ViewResult
 	view, resultMaybe, err := bucket.findView(docName, viewName, stale)
 	if err != nil {
 		return result, err
 	}
 	if view == nil {
-		return result, walrus.MissingError{Key: docName + "/" + viewName}
+		return result, sgbucket.MissingError{Key: docName + "/" + viewName}
 	} else if resultMaybe != nil {
 		result = *resultMaybe
 	} else {
 		result = bucket.updateView(view, 0)
 	}
 
-	return walrus.ProcessViewResult(result, params, bucket, view.reduceFunction)
+	return sgbucket.ProcessViewResult(result, params, bucket, view.reduceFunction)
 
 }
 
@@ -60,8 +60,8 @@ func (bucket *forestdbBucket) ViewCustom(ddoc, name string, params map[string]in
 }
 
 // Looks up a lolrusView, and its current index if it's up-to-date enough.
-// TODO: consolidate with walrus codebase to fix code duplication
-func (bucket *forestdbBucket) findView(docName, viewName string, staleOK bool) (view *forestdbView, result *walrus.ViewResult, err error) {
+// TODO: consolidate with sgbucket codebase to fix code duplication
+func (bucket *forestdbBucket) findView(docName, viewName string, staleOK bool) (view *forestdbView, result *sgbucket.ViewResult, err error) {
 	bucket.lock.RLock()
 	defer bucket.lock.RUnlock()
 
@@ -91,13 +91,13 @@ func (bucket *forestdbBucket) findView(docName, viewName string, staleOK bool) (
 }
 
 // Updates the view index if necessary, and returns it.
-// TODO: consolidate with walrus codebase to fix code duplication
-func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) walrus.ViewResult {
+// TODO: consolidate with sgbucket codebase to fix code duplication
+func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) sgbucket.ViewResult {
 
 	bucket.lock.Lock()
 	defer bucket.lock.Unlock()
 
-	result := walrus.ViewResult{}
+	result := sgbucket.ViewResult{}
 
 	lastSeq, err := bucket.LastSeq()
 	if err != nil {
@@ -112,8 +112,8 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		return view.index
 	}
 
-	result.Rows = make([]*walrus.ViewRow, 0)
-	result.Errors = make([]walrus.ViewError, 0)
+	result.Rows = make([]*sgbucket.ViewRow, 0)
+	result.Errors = make([]sgbucket.ViewError, 0)
 
 	updatedKeysSize := toSequence - view.lastIndexedSequence
 	if updatedKeysSize > 1000 {
@@ -130,7 +130,7 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		rows, err := mapFunction.CallFunction(string(raw), docid)
 		if err != nil {
 			log.Printf("Error running map function: %s", err)
-			output <- walrus.ViewError{
+			output <- sgbucket.ViewError{
 				From:   docid,
 				Reason: err.Error(),
 			}
@@ -139,7 +139,7 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		}
 	}
 	mapInput := make(chan interface{})
-	mapOutput := walrus.Parallelize(mapper, 0, mapInput)
+	mapOutput := sgbucket.Parallelize(mapper, 0, mapInput)
 
 	// Start another task to read the map output and store it into result.Rows/Errors:
 	var waiter sync.WaitGroup
@@ -148,9 +148,9 @@ func (bucket *forestdbBucket) updateView(view *forestdbView, toSequence uint64) 
 		defer waiter.Done()
 		for item := range mapOutput {
 			switch item := item.(type) {
-			case walrus.ViewError:
+			case sgbucket.ViewError:
 				result.Errors = append(result.Errors, item)
-			case []*walrus.ViewRow:
+			case []*sgbucket.ViewRow:
 				result.Rows = append(result.Rows, item...)
 			}
 		}
@@ -240,7 +240,7 @@ func (bucket *forestdbBucket) GetDDoc(docname string, into interface{}) error {
 	rawDdoc, err := bucket.kvstoreDdocs.GetKV([]byte(docname))
 	if err != nil {
 		if err == forestdb.RESULT_KEY_NOT_FOUND {
-			return walrus.MissingError{
+			return sgbucket.MissingError{
 				Key: docname,
 			}
 		}
@@ -251,7 +251,7 @@ func (bucket *forestdbBucket) GetDDoc(docname string, into interface{}) error {
 }
 
 func (bucket *forestdbBucket) PutDDoc(docname string, value interface{}) error {
-	design, err := walrus.CheckDDoc(value)
+	design, err := sgbucket.CheckDDoc(value)
 	if err != nil {
 		return err
 	}
@@ -293,13 +293,13 @@ func (bucket *forestdbBucket) DeleteDDoc(docname string) error {
 	return nil
 }
 
-func (bucket *forestdbBucket) _compileDesignDoc(docname string, design *walrus.DesignDoc) error {
+func (bucket *forestdbBucket) _compileDesignDoc(docname string, design *sgbucket.DesignDoc) error {
 	if design == nil {
 		return nil
 	}
 	ddoc := forestdbDesignDoc{}
 	for name, fns := range design.Views {
-		jsserver := walrus.NewJSMapFunction(fns.Map)
+		jsserver := sgbucket.NewJSMapFunction(fns.Map)
 		view := &forestdbView{
 			mapFunction:    jsserver,
 			reduceFunction: fns.Reduce,

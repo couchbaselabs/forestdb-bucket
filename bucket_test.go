@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/couchbase/sg-bucket"
 	"github.com/couchbaselabs/go.assert"
 	"github.com/couchbaselabs/goforestdb"
-	"github.com/couchbaselabs/walrus"
 )
 
-// If we try to Get() a missing key, asser that a walrus.MissingError is returned
+// If we try to Get() a missing key, asser that a sgbucket.MissingError is returned
 func TestGetMissingKey(t *testing.T) {
 
 	bucket, tempDir := GetTestBucket()
@@ -28,7 +28,7 @@ func TestGetMissingKey(t *testing.T) {
 	err := bucket.Get("missingkey", &value)
 	assert.True(t, err != nil)
 	log.Printf("err: %v type: %T", err, err)
-	_, ok := err.(walrus.MissingError)
+	_, ok := err.(sgbucket.MissingError)
 	assert.True(t, ok)
 
 }
@@ -101,9 +101,12 @@ func TestDurableAdd(t *testing.T) {
 
 	// make sure we can get the doc by key and it has expected val
 	doc, err := forestdb.NewDoc([]byte(key), nil, nil)
+	log.Printf("created new doc, has seq: %v", doc.SeqNum())
+
 	assert.True(t, err == nil)
 	defer doc.Close()
 	err = kvstore.Get(doc)
+	log.Printf("after Get, doc has seq: %v", doc.SeqNum())
 	assert.True(t, err == nil)
 	assert.True(t, len(doc.Body()) > 0)
 	docJson := make(map[string]string)
@@ -138,7 +141,7 @@ func TestDeleteViaUpdate(t *testing.T) {
 
 	// Get -- should return MissingKeyError
 	err = bucket.Get("key", &value2)
-	_, ok := err.(walrus.MissingError)
+	_, ok := err.(sgbucket.MissingError)
 	assert.True(t, ok)
 
 }
@@ -165,7 +168,7 @@ func TestDeleteThenAdd(t *testing.T) {
 
 	assertNoError(t, bucket.Delete("key"), "Delete")
 	err = bucket.Get("key", &value2)
-	_, ok := err.(walrus.MissingError) // make sure right type of error
+	_, ok := err.(sgbucket.MissingError) // make sure right type of error
 	assert.True(t, ok)
 	log.Printf("err: %v", err)
 	assert.True(t, err != nil)
@@ -182,12 +185,12 @@ func TestDeleteThenAdd(t *testing.T) {
 }
 
 func TestCheckDDoc(t *testing.T) {
-	ddoc := walrus.DesignDoc{Views: walrus.ViewMap{"view1": walrus.ViewDef{Map: `function(doc){if (doc.key) emit(doc.key,doc.value)}`}}}
-	_, err := walrus.CheckDDoc(&ddoc)
+	ddoc := sgbucket.DesignDoc{Views: sgbucket.ViewMap{"view1": sgbucket.ViewDef{Map: `function(doc){if (doc.key) emit(doc.key,doc.value)}`}}}
+	_, err := sgbucket.CheckDDoc(&ddoc)
 	assertNoError(t, err, "CheckDDoc should have worked")
 
-	ddoc = walrus.DesignDoc{Language: "go"}
-	_, err = walrus.CheckDDoc(&ddoc)
+	ddoc = sgbucket.DesignDoc{Language: "go"}
+	_, err = sgbucket.CheckDDoc(&ddoc)
 	assertTrue(t, err != nil, "CheckDDoc should have rejected non-JS")
 }
 
@@ -333,7 +336,7 @@ func TestAppend(t *testing.T) {
 	defer CloseBucket(bucket)
 
 	err := bucket.Append("key", []byte(" World"))
-	assert.DeepEquals(t, err, walrus.MissingError{
+	assert.DeepEquals(t, err, sgbucket.MissingError{
 		Key: "key",
 	})
 
@@ -421,7 +424,7 @@ func TestCloseTwice(t *testing.T) {
 
 	defer os.RemoveAll(tempDir)
 
-	if bucket, ok := bucket.(walrus.DeleteableBucket); ok {
+	if bucket, ok := bucket.(sgbucket.DeleteableBucket); ok {
 		bucket.Close()
 		err := bucket.CloseAndDelete()
 		log.Printf("CloseAndDelete() returned: %v", err)

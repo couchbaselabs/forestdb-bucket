@@ -1,7 +1,7 @@
 
 [![Join the chat at https://gitter.im/couchbase/mobile](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/couchbase/mobile?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-A ForestDB bucket for Sync Gateway that conforms to the Walrus Bucket interface.
+A ForestDB bucket for Sync Gateway that conforms to the SG-Bucket interface.
 
 You will first need to install ForestDB (see goforestdb README).  It has been tested with ForestDB commit c2e700a79.
 

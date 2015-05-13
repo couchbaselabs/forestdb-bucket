@@ -3,7 +3,7 @@ package forestbucket
 import (
 	"log"
 
-	"github.com/couchbaselabs/walrus"
+	"github.com/couchbase/sg-bucket"
 )
 
 const (
@@ -33,7 +33,7 @@ func init() {
 // will be named "bucketName", or if the poolName is not
 // "default", "poolName-bucketName".
 //
-func GetBucket(url, poolName, bucketName string) (walrus.Bucket, error) {
+func GetBucket(url, poolName, bucketName string) (sgbucket.Bucket, error) {
 
 	bucketRootPath, err := bucketURLToDir(url)
 	if err != nil {
@@ -57,6 +57,6 @@ func GetBucket(url, poolName, bucketName string) (walrus.Bucket, error) {
 }
 
 // Close a bucket and remove from cache of Bucket objects
-func CloseBucket(bucket walrus.Bucket) {
+func CloseBucket(bucket sgbucket.Bucket) {
 	bucket.Close()
 }

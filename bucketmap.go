@@ -3,8 +3,8 @@ package forestbucket
 import (
 	"fmt"
 
+	"github.com/couchbase/sg-bucket"
 	"github.com/couchbaselabs/go-safe-dstruct/mapserver"
-	"github.com/couchbaselabs/walrus"
 )
 
 type bucketMap struct {
@@ -33,17 +33,17 @@ func (bm bucketMap) key(url, poolName, bucketName string) string {
 
 }
 
-func (bm bucketMap) find(key string) (bucket walrus.Bucket, found bool) {
+func (bm bucketMap) find(key string) (bucket sgbucket.Bucket, found bool) {
 
 	rawVal, found := bm.wrapped.Find(key)
 	if !found {
 		return nil, found
 	}
-	return rawVal.(walrus.Bucket), true
+	return rawVal.(sgbucket.Bucket), true
 
 }
 
-func (bm bucketMap) insert(key string, bucket walrus.Bucket) {
+func (bm bucketMap) insert(key string, bucket sgbucket.Bucket) {
 	bm.wrapped.Insert(key, bucket)
 }
 
@@ -52,11 +52,11 @@ func (bm bucketMap) delete(key string) {
 }
 
 // Snapshot returns a snapshot copy of the map
-func (bm bucketMap) snapshot() map[string]walrus.Bucket {
-	reply := make(map[string]walrus.Bucket)
+func (bm bucketMap) snapshot() map[string]sgbucket.Bucket {
+	reply := make(map[string]sgbucket.Bucket)
 	interfaceSnapshot := bm.wrapped.Snapshot()
 	for k, v := range interfaceSnapshot {
-		reply[k] = v.(walrus.Bucket)
+		reply[k] = v.(sgbucket.Bucket)
 	}
 	return reply
 }

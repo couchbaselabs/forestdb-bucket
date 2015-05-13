@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/couchbase/sg-bucket"
 	"github.com/couchbaselabs/go.assert"
-	"github.com/couchbaselabs/walrus"
 )
 
 func TestBackfill(t *testing.T) {
@@ -19,23 +19,23 @@ func TestBackfill(t *testing.T) {
 	bucket.Add("baker", 0, "B")
 	bucket.Add("charlie", 0, "C")
 
-	feed, err := bucket.StartTapFeed(walrus.TapArguments{Backfill: 0, Dump: true})
+	feed, err := bucket.StartTapFeed(sgbucket.TapArguments{Backfill: 0, Dump: true})
 	assertNoError(t, err, "StartTapFeed failed")
 	assert.True(t, feed != nil)
 
 	event := <-feed.Events()
-	assert.Equals(t, event.Opcode, walrus.TapBeginBackfill)
+	assert.Equals(t, event.Opcode, sgbucket.TapBeginBackfill)
 	results := map[string]string{}
 	for i := 0; i < 3; i++ {
 		event := <-feed.Events()
-		assert.Equals(t, event.Opcode, walrus.TapMutation)
+		assert.Equals(t, event.Opcode, sgbucket.TapMutation)
 		results[string(event.Key)] = string(event.Value)
 	}
 	assert.DeepEquals(t, results, map[string]string{
 		"able": `"A"`, "baker": `"B"`, "charlie": `"C"`})
 
 	event = <-feed.Events()
-	assert.Equals(t, event.Opcode, walrus.TapEndBackfill)
+	assert.Equals(t, event.Opcode, sgbucket.TapEndBackfill)
 
 	event, ok := <-feed.Events()
 	assert.False(t, ok)
@@ -48,7 +48,7 @@ func TestBackfillEmptyBucket(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	defer CloseBucket(bucket)
 
-	feed, err := bucket.StartTapFeed(walrus.TapArguments{Backfill: 0, Dump: true})
+	feed, err := bucket.StartTapFeed(sgbucket.TapArguments{Backfill: 0, Dump: true})
 	assertNoError(t, err, "StartTapFeed failed")
 	assert.True(t, feed != nil)
 
@@ -65,7 +65,7 @@ func TestMutations(t *testing.T) {
 	bucket.Add("baker", 0, "B")
 	bucket.Add("charlie", 0, "C")
 
-	feed, err := bucket.StartTapFeed(walrus.TapArguments{Backfill: walrus.TapNoBackfill})
+	feed, err := bucket.StartTapFeed(sgbucket.TapArguments{Backfill: sgbucket.TapNoBackfill})
 	assertNoError(t, err, "StartTapFeed failed")
 	assert.True(t, feed != nil)
 	defer feed.Close()
@@ -78,10 +78,10 @@ func TestMutations(t *testing.T) {
 		bucket.Delete("eskimo")
 	}()
 
-	assert.DeepEquals(t, <-feed.Events(), walrus.TapEvent{Opcode: walrus.TapMutation, Key: []byte("delta"), Value: []byte(`"D"`), Sequence: 4})
-	assert.DeepEquals(t, <-feed.Events(), walrus.TapEvent{Opcode: walrus.TapMutation, Key: []byte("eskimo"), Value: []byte(`"E"`), Sequence: 5})
-	assert.DeepEquals(t, <-feed.Events(), walrus.TapEvent{Opcode: walrus.TapMutation, Key: []byte("fahrvergnügen"), Value: []byte(`"F"`), Sequence: 6})
+	assert.DeepEquals(t, <-feed.Events(), sgbucket.TapEvent{Opcode: sgbucket.TapMutation, Key: []byte("delta"), Value: []byte(`"D"`), Sequence: 4})
+	assert.DeepEquals(t, <-feed.Events(), sgbucket.TapEvent{Opcode: sgbucket.TapMutation, Key: []byte("eskimo"), Value: []byte(`"E"`), Sequence: 5})
+	assert.DeepEquals(t, <-feed.Events(), sgbucket.TapEvent{Opcode: sgbucket.TapMutation, Key: []byte("fahrvergnügen"), Value: []byte(`"F"`), Sequence: 6})
 
-	assert.DeepEquals(t, <-feed.Events(), walrus.TapEvent{Opcode: walrus.TapDeletion, Key: []byte("eskimo"), Sequence: 7})
+	assert.DeepEquals(t, <-feed.Events(), sgbucket.TapEvent{Opcode: sgbucket.TapDeletion, Key: []byte("eskimo"), Sequence: 7})
 
 }
