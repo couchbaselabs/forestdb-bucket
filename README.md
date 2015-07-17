@@ -9,6 +9,8 @@ You will first need to install ForestDB (see goforestdb README).  It has been te
 
 [![GoDoc](https://godoc.org/github.com/couchbaselabs/forestdb-bucket?status.png)](https://godoc.org/github.com/couchbaselabs/forestdb-bucket) 
 
+To see it in Sync Gateway [there is a development branch](https://github.com/couchbase/sync_gateway/tree/feature/forestdb_bucket)
+
 ## Running tests
 
 ```
